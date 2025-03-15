@@ -1,7 +1,7 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using LiteDB;
+using MySql.Data.MySqlClient;
 using PluginAPI.Core;
 using PluginAPI.Core.Attributes;
 using PluginAPI.Enums;
@@ -16,18 +16,12 @@ namespace TheRiptide
         //configs collection
         class Config
         {
-            [BsonId]
             public string UserId { get; set; }
-            //loadout
             public ItemType primary { get; set; } = ItemType.None;
             public ItemType secondary { get; set; } = ItemType.None;
             public ItemType tertiary { get; set; } = ItemType.None;
             public bool rage_enabled { get; set; } = false;
-
-            //spawn
             public RoleTypeId role { get; set; } = RoleTypeId.ClassD;
-
-            //killstreak
             public string killstreak_mode { get; set; } = "";
         }
 
@@ -79,15 +73,10 @@ namespace TheRiptide
             public RoleTypeId role { get; set; } = RoleTypeId.ClassD;
             public int shots { get; set; } = 0;
             public float time { get; set; } = UnityEngine.Time.time;
-            [BsonRef("loadouts")]
             public Loadout loadout { get; set; } = null;
-            [BsonRef("kills")]
             public List<Kill> kills { get; set; } = new List<Kill>();
-            [BsonRef("hits")]
             public List<Hit> delt { get; set; } = new List<Hit>();
-            [BsonRef("hits")]
             public List<Hit> received { get; set; } = new List<Hit>();
-            [BsonRef("kills")]
             public Kill death { get; set; } = null;
         }
 
@@ -105,32 +94,26 @@ namespace TheRiptide
             public string nickname { get; set; } = "*unconnected";
             public System.DateTime connect { get; set; } = System.DateTime.Now;
             public System.DateTime disconnect { get; set; } = System.DateTime.Now;
-            [BsonRef("rounds")]
             public Round round { get; set; } = null;
-            [BsonRef("lives")]
             public List<Life> lives { get; set; } = new List<Life>();
         }
 
         public class Tracking
         {
             public long TrackingId { get; set; }
-            [BsonRef("sessions")]
             public List<Session> sessions { get; set; } = new List<Session>();
         }
 
         public class User
         {
             public string UserId { get; set; }
-            [BsonRef("tracking")]
             public Tracking tracking { get; set; } = new Tracking();
         }
-
 
         //ranks collection
         public enum RankState { Unranked, Placement, Ranked };
         public class Rank
         {
-            [BsonId]
             public string UserId { get; set; }
             public RankState state { get; set; } = RankState.Unranked;
             public int placement_matches { get; set; } = 0;
@@ -142,7 +125,6 @@ namespace TheRiptide
         //experience collection
         public class Experience
         {
-            [BsonId]
             public string UserId { get; set; }
             public int value { get; set; } = 0;
             public int level { get; set; } = 0;
@@ -153,7 +135,6 @@ namespace TheRiptide
         //leader board collection
         public class LeaderBoard
         {
-            [BsonId]
             public string UserId { get; set; }
             public int total_kills { get; set; } = 0;
             public int highest_killstreak { get; set; } = 0;
@@ -172,43 +153,26 @@ namespace TheRiptide
             }
         }
 
-        private LiteDatabase db;
-        public LiteDatabase DB { get { return db; } }
+        private MySqlConnection db;
+        public MySqlConnection DB { get { return db; } }
 
-        private Database()
-        {
-            BsonMapper.Global.RegisterType
-            (
-                serialize: (Hit h) =>
-                {
-                    BsonValue doc = new BsonDocument();
-                    doc["_id"] = h.HitId;
-                    doc["data"] = System.BitConverter.ToInt32(new byte[] { h.health, h.damage, h.hitbox, h.weapon }, 0);
-                    return doc;
-                },
-                deserialize: (BsonValue value) =>
-                {
-                    BsonDocument doc = value.AsDocument;
-                    byte[] data = System.BitConverter.GetBytes(doc["data"].AsInt32);
-                    return new Hit { HitId = doc["_id"], health = data[0], damage = data[1], hitbox = data[2], weapon = data[3] };
-                }
-            );
-            BsonMapper.Global.EmptyStringToNull = false;
-        }
+        private Database() { }
 
         public void Load(string config_path)
         {
-            db = new LiteDatabase($"filename={config_path.Replace("config.yml", "") + "Deathmatch.db"};auto-rebuild=true");
+            string connectionString = "server=localhost;user=root;database=deathmatch;port=3306;password=your_password";
+            db = new MySqlConnection(connectionString);
+            db.Open();
         }
 
         public void UnLoad()
         {
-            db.Dispose();
+            db.Close();
         }
 
         public void Checkpoint()
         {
-            DbAsync(() => db.Checkpoint());
+            // No equivalent method in MySQL, so this is a no-op
         }
 
         public void LoadConfig(Player player)
@@ -219,22 +183,23 @@ namespace TheRiptide
                 Lobby.Spawn spawn = Lobby.Singleton.GetSpawn(player);
                 Killstreaks.Killstreak killstreak = Killstreaks.GetKillstreak(player);
 
-                var configs = db.GetCollection<Config>("configs");
-                configs.EnsureIndex(x => x.UserId);
-                Config config = configs.FindById(player.UserId);
-                if (config != null)
+                string query = $"SELECT * FROM configs WHERE UserId = '{player.UserId}'";
+                MySqlCommand cmd = new MySqlCommand(query, db);
+                MySqlDataReader reader = cmd.ExecuteReader();
+                if (reader.Read())
                 {
                     Timing.CallDelayed(0.0f, () =>
                     {
-                        loadout.primary = config.primary;
-                        loadout.secondary = config.secondary;
-                        loadout.tertiary = config.tertiary;
-                        loadout.rage_mode_enabled = config.rage_enabled;
-                        spawn.role = config.role;
-                        killstreak.name = config.killstreak_mode;
+                        loadout.primary = (ItemType)reader.GetInt32("primary");
+                        loadout.secondary = (ItemType)reader.GetInt32("secondary");
+                        loadout.tertiary = (ItemType)reader.GetInt32("tertiary");
+                        loadout.rage_mode_enabled = reader.GetBoolean("rage_enabled");
+                        spawn.role = (RoleTypeId)reader.GetInt32("role");
+                        killstreak.name = reader.GetString("killstreak_mode");
                         Killstreaks.Singleton.KillstreakLoaded(player);
                     });
                 }
+                reader.Close();
             });
         }
 
@@ -292,16 +257,9 @@ namespace TheRiptide
 
             DbAsync(() =>
             {
-                var configs = db.GetCollection<Config>("configs");
-                configs.EnsureIndex(x => x.UserId);
-                Config config = new Config { UserId = player.UserId };
-                config.primary = loadout.primary;
-                config.secondary = loadout.secondary;
-                config.tertiary = loadout.tertiary;
-                config.rage_enabled = loadout.rage_mode_enabled;
-                config.role = spawn.role;
-                config.killstreak_mode = killstreak.name;
-                configs.Upsert(config);
+                string query = $"REPLACE INTO configs (UserId, primary, secondary, tertiary, rage_enabled, role, killstreak_mode) VALUES ('{player.UserId}', {(int)loadout.primary}, {(int)loadout.secondary}, {(int)loadout.tertiary}, {loadout.rage_mode_enabled}, {(int)spawn.role}, '{killstreak.name}')";
+                MySqlCommand cmd = new MySqlCommand(query, db);
+                cmd.ExecuteNonQuery();
             });
         }
 
@@ -310,29 +268,30 @@ namespace TheRiptide
             DbDelayedAsync(() =>
             {
                 Rank player_rank = Ranks.Singleton.GetRank(player);
-                var ranks = db.GetCollection<Rank>("ranks");
-                ranks.EnsureIndex(x => x.UserId);
-                Rank rank = ranks.FindById(player.UserId);
-                Timing.CallDelayed(0.0f, () =>
+                string query = $"SELECT * FROM ranks WHERE UserId = '{player.UserId}'";
+                MySqlCommand cmd = new MySqlCommand(query, db);
+                MySqlDataReader reader = cmd.ExecuteReader();
+                if (reader.Read())
                 {
-                    try
+                    Timing.CallDelayed(0.0f, () =>
                     {
-                        if (rank != null)
+                        try
                         {
-                            player_rank.UserId = rank.UserId;
-                            player_rank.state = rank.state;
-                            player_rank.placement_matches = rank.placement_matches;
-                            player_rank.rating = rank.rating;
-                            player_rank.rd = rank.rd;
-                            player_rank.rv = rank.rv;
+                            player_rank.UserId = reader.GetString("UserId");
+                            player_rank.state = (RankState)reader.GetInt32("state");
+                            player_rank.placement_matches = reader.GetInt32("placement_matches");
+                            player_rank.rating = reader.GetFloat("rating");
+                            player_rank.rd = reader.GetFloat("rd");
+                            player_rank.rv = reader.GetFloat("rv");
+                            Ranks.Singleton.RankLoaded(player);
                         }
-                        Ranks.Singleton.RankLoaded(player);
-                    }
-                    catch (System.Exception ex)
-                    {
-                        Log.Error("database rank error: " + ex.ToString());
-                    }
-                });
+                        catch (System.Exception ex)
+                        {
+                            Log.Error("database rank error: " + ex.ToString());
+                        }
+                    });
+                }
+                reader.Close();
             });
         }
 
@@ -340,9 +299,9 @@ namespace TheRiptide
         {
             DbAsync(() =>
             {
-                var ranks = db.GetCollection<Rank>("ranks");
-                ranks.EnsureIndex(x => x.UserId);
-                ranks.Upsert(rank);
+                string query = $"REPLACE INTO ranks (UserId, state, placement_matches, rating, rd, rv) VALUES ('{rank.UserId}', {(int)rank.state}, {rank.placement_matches}, {rank.rating}, {rank.rd}, {rank.rv})";
+                MySqlCommand cmd = new MySqlCommand(query, db);
+                cmd.ExecuteNonQuery();
             });
         }
 
@@ -351,27 +310,28 @@ namespace TheRiptide
             DbDelayedAsync(() =>
             {
                 Experiences.XP player_xp = Experiences.Singleton.GetXP(player);
-                var experiences = db.GetCollection<Experience>("experiences");
-                experiences.EnsureIndex(x => x.UserId);
-                Experience xp = experiences.FindById(player.UserId);
-                Timing.CallDelayed(0.0f, () =>
+                string query = $"SELECT * FROM experiences WHERE UserId = '{player.UserId}'";
+                MySqlCommand cmd = new MySqlCommand(query, db);
+                MySqlDataReader reader = cmd.ExecuteReader();
+                if (reader.Read())
                 {
-                    try
+                    Timing.CallDelayed(0.0f, () =>
                     {
-                        if (xp != null)
+                        try
                         {
-                            player_xp.value = xp.value;
-                            player_xp.level = xp.level;
-                            player_xp.stage = xp.stage;
-                            player_xp.tier = xp.tier;
+                            player_xp.value = reader.GetInt32("value");
+                            player_xp.level = reader.GetInt32("level");
+                            player_xp.stage = reader.GetInt32("stage");
+                            player_xp.tier = reader.GetInt32("tier");
+                            Experiences.Singleton.XpLoaded(player);
                         }
-                        Experiences.Singleton.XpLoaded(player);
-                    }
-                    catch(System.Exception ex)
-                    {
-                        Log.Error("database experience error: " + ex.ToString());
-                    }
-                });
+                        catch(System.Exception ex)
+                        {
+                            Log.Error("database experience error: " + ex.ToString());
+                        }
+                    });
+                }
+                reader.Close();
             });
         }
 
@@ -380,14 +340,9 @@ namespace TheRiptide
             Experiences.XP player_xp = Experiences.Singleton.GetXP(player);
             DbAsync(() =>
             {
-                var experiences = db.GetCollection<Experience>("experiences");
-                experiences.EnsureIndex(x => x.UserId);
-                Experience xp = new Experience { UserId = player.UserId };
-                xp.value = player_xp.value;
-                xp.level = player_xp.level;
-                xp.stage = player_xp.stage;
-                xp.tier = player_xp.tier;
-                experiences.Upsert(xp);
+                string query = $"REPLACE INTO experiences (UserId, value, level, stage, tier) VALUES ('{player.UserId}', {player_xp.value}, {player_xp.level}, {player_xp.stage}, {player_xp.tier})";
+                MySqlCommand cmd = new MySqlCommand(query, db);
+                cmd.ExecuteNonQuery();
             });
         }
 
@@ -396,62 +351,91 @@ namespace TheRiptide
             Session session = TheRiptide.Tracking.Singleton.GetSession(player);
             DbAsync(() =>
             {
-                var hits = db.GetCollection<Hit>("hits");
-                hits.EnsureIndex(x => x.HitId);
-                var kills = db.GetCollection<Kill>("kills");
-                kills.EnsureIndex(x => x.KillId);
-                var loadouts = db.GetCollection<Loadout>("loadouts");
-                loadouts.EnsureIndex(x => x.LoadoutId);
-                var lives = db.GetCollection<Life>("lives");
-                lives.EnsureIndex(x => x.LifeId);
-                var rounds = db.GetCollection<Round>("rounds");
-                rounds.EnsureIndex(x => x.RoundId);
-                var sessions = db.GetCollection<Session>("sessions");
-                sessions.EnsureIndex(x => x.SessionId);
-                var tracking = db.GetCollection<Tracking>("tracking");
-                tracking.EnsureIndex(x => x.TrackingId);
-                var users = db.GetCollection<User>("users");
-                users.EnsureIndex(x => x.UserId);
-
                 foreach(Life life in session.lives)
                 {
                     foreach (Hit hit in life.delt)
-                        hits.Upsert(hit);
+                    {
+                        string query = $"REPLACE INTO hits (HitId, health, damage, hitbox, weapon) VALUES ({hit.HitId}, {hit.health}, {hit.damage}, {hit.hitbox}, {hit.weapon})";
+                        MySqlCommand cmd = new MySqlCommand(query, db);
+                        cmd.ExecuteNonQuery();
+                    }
 
                     foreach (Hit hit in life.received)
-                        hits.Upsert(hit);
+                    {
+                        string query = $"REPLACE INTO hits (HitId, health, damage, hitbox, weapon) VALUES ({hit.HitId}, {hit.health}, {hit.damage}, {hit.hitbox}, {hit.weapon})";
+                        MySqlCommand cmd = new MySqlCommand(query, db);
+                        cmd.ExecuteNonQuery();
+                    }
 
                     foreach (Kill kill in life.kills)
-                        kills.Upsert(kill);
+                    {
+                        string query = $"REPLACE INTO kills (KillId, time, hitbox, weapon, attachment_code) VALUES ({kill.KillId}, {kill.time}, {(int)kill.hitbox}, {(int)kill.weapon}, {kill.attachment_code})";
+                        MySqlCommand cmd = new MySqlCommand(query, db);
+                        cmd.ExecuteNonQuery();
+                    }
 
                     if (life.death != null)
-                        kills.Upsert(life.death);
+                    {
+                        string query = $"REPLACE INTO kills (KillId, time, hitbox, weapon, attachment_code) VALUES ({life.death.KillId}, {life.death.time}, {(int)life.death.hitbox}, {(int)life.death.weapon}, {life.death.attachment_code})";
+                        MySqlCommand cmd = new MySqlCommand(query, db);
+                        cmd.ExecuteNonQuery();
+                    }
 
                     if (life.loadout != null)
-                        loadouts.Upsert(life.loadout);
+                    {
+                        string query = $"REPLACE INTO loadouts (LoadoutId, killstreak_mode, primary, primary_attachment_code, secondary, secondary_attachment_code, tertiary, tertiary_attachment_code) VALUES ({life.loadout.LoadoutId}, '{life.loadout.killstreak_mode}', {(int)life.loadout.primary}, {life.loadout.primary_attachment_code}, {(int)life.loadout.secondary}, {life.loadout.secondary_attachment_code}, {(int)life.loadout.tertiary}, {life.loadout.tertiary_attachment_code})";
+                        MySqlCommand cmd = new MySqlCommand(query, db);
+                        cmd.ExecuteNonQuery();
+                    }
 
-                    lives.Upsert(life);
+                    string lifeQuery = $"REPLACE INTO lives (LifeId, role, shots, time, loadout) VALUES ({life.LifeId}, {(int)life.role}, {life.shots}, {life.time}, {life.loadout?.LoadoutId})";
+                    MySqlCommand lifeCmd = new MySqlCommand(lifeQuery, db);
+                    lifeCmd.ExecuteNonQuery();
                 }
 
                 if (session.round != null)
-                    rounds.Upsert(session.round);
+                {
+                    string roundQuery = $"REPLACE INTO rounds (RoundId, start, end, max_players) VALUES ({session.round.RoundId}, '{session.round.start.ToString("yyyy-MM-dd HH:mm:ss")}', '{session.round.end.ToString("yyyy-MM-dd HH:mm:ss")}', {session.round.max_players})";
+                    MySqlCommand roundCmd = new MySqlCommand(roundQuery, db);
+                    roundCmd.ExecuteNonQuery();
+                }
 
-                sessions.Upsert(session);
+                string sessionQuery = $"REPLACE INTO sessions (SessionId, nickname, connect, disconnect, round) VALUES ({session.SessionId}, '{session.nickname}', '{session.connect.ToString("yyyy-MM-dd HH:mm:ss")}', '{session.disconnect.ToString("yyyy-MM-dd HH:mm:ss")}', {session.round?.RoundId})";
+                MySqlCommand sessionCmd = new MySqlCommand(sessionQuery, db);
+                sessionCmd.ExecuteNonQuery();
 
                 if (!player.DoNotTrack)
                 {
-                    User user = users.Include(x => x.tracking).FindById(player.UserId);
-                    if(user == null)
+                    string userQuery = $"SELECT * FROM users WHERE UserId = '{player.UserId}'";
+                    MySqlCommand userCmd = new MySqlCommand(userQuery, db);
+                    MySqlDataReader reader = userCmd.ExecuteReader();
+                    User user = null;
+                    if (reader.Read())
+                    {
+                        user = new User { UserId = reader.GetString("UserId") };
+                        user.tracking.TrackingId = reader.GetInt64("TrackingId");
+                    }
+                    reader.Close();
+
+                    if (user == null)
                         user = new User { UserId = player.UserId };
+
                     user.tracking.sessions.Add(session);
-                    tracking.Upsert(user.tracking);
-                    users.Upsert(user);
+                    string trackingQuery = $"REPLACE INTO tracking (TrackingId) VALUES ({user.tracking.TrackingId})";
+                    MySqlCommand trackingCmd = new MySqlCommand(trackingQuery, db);
+                    trackingCmd.ExecuteNonQuery();
+
+                    string userInsertQuery = $"REPLACE INTO users (UserId, TrackingId) VALUES ('{user.UserId}', {user.tracking.TrackingId})";
+                    MySqlCommand userInsertCmd = new MySqlCommand(userInsertQuery, db);
+                    userInsertCmd.ExecuteNonQuery();
                 }
                 else
                 {
-                    Tracking player_tracking = player_tracking = new Tracking();
+                    Tracking player_tracking = new Tracking();
                     player_tracking.sessions.Add(session);
-                    tracking.Upsert(player_tracking);
+                    string trackingQuery = $"REPLACE INTO tracking (TrackingId) VALUES ({player_tracking.TrackingId})";
+                    MySqlCommand trackingCmd = new MySqlCommand(trackingQuery, db);
+                    trackingCmd.ExecuteNonQuery();
                 }
             });
         }
@@ -464,9 +448,23 @@ namespace TheRiptide
                 if (TheRiptide.LeaderBoard.Singleton.config.BeginEpoch < session.connect && 
                     session.connect < TheRiptide.LeaderBoard.Singleton.config.EndEpoch)
                 {
-                    var leader_board = db.GetCollection<LeaderBoard>("leader_board");
-                    leader_board.EnsureIndex(x => x.UserId);
-                    LeaderBoard lb = leader_board.FindById(player.UserId);
+                    string query = $"SELECT * FROM leader_board WHERE UserId = '{player.UserId}'";
+                    MySqlCommand cmd = new MySqlCommand(query, db);
+                    MySqlDataReader reader = cmd.ExecuteReader();
+                    LeaderBoard lb = null;
+                    if (reader.Read())
+                    {
+                        lb = new LeaderBoard
+                        {
+                            UserId = reader.GetString("UserId"),
+                            total_play_time = reader.GetInt32("total_play_time"),
+                            total_kills = reader.GetInt32("total_kills"),
+                            highest_killstreak = reader.GetInt32("highest_killstreak"),
+                            killstreak_tag = reader.GetString("killstreak_tag")
+                        };
+                    }
+                    reader.Close();
+
                     if (lb == null)
                         lb = new LeaderBoard { UserId = player.UserId };
 
@@ -488,7 +486,10 @@ namespace TheRiptide
                             lb.killstreak_tag = life.loadout.killstreak_mode;
                         }
                     }
-                    leader_board.Upsert(lb);
+
+                    string updateQuery = $"REPLACE INTO leader_board (UserId, total_play_time, total_kills, highest_killstreak, killstreak_tag) VALUES ('{lb.UserId}', {lb.total_play_time}, {lb.total_kills}, {lb.highest_killstreak}, '{lb.killstreak_tag}')";
+                    MySqlCommand updateCmd = new MySqlCommand(updateQuery, db);
+                    updateCmd.ExecuteNonQuery();
                 }
             });
         }
@@ -497,16 +498,13 @@ namespace TheRiptide
         {
             DbAsync(() =>
             {
-                var users = db.GetCollection<User>("users");
-                users.Delete(user_id);
-                var experiences = db.GetCollection<Experience>("experiences");
-                experiences.Delete(user_id);
-                var ranks = db.GetCollection<Rank>("ranks");
-                ranks.Delete(user_id);
-                var configs = db.GetCollection<Config>("configs");
-                configs.Delete(user_id);
-                var leader_boards = db.GetCollection<LeaderBoard>("leader_board");
-                leader_boards.Delete(user_id);
+                string[] tables = { "users", "experiences", "ranks", "configs", "leader_board" };
+                foreach (string table in tables)
+                {
+                    string query = $"DELETE FROM {table} WHERE UserId = '{user_id}'";
+                    MySqlCommand cmd = new MySqlCommand(query, db);
+                    cmd.ExecuteNonQuery();
+                }
             });
         }
 
@@ -515,7 +513,7 @@ namespace TheRiptide
             DeleteData(player.UserId);
         }
 
-        public void Async(System.Action<LiteDatabase> action)
+        public void Async(System.Action<MySqlConnection> action)
         {
             new Task(() =>
             {
