@@ -1,11 +1,9 @@
-﻿using LightContainmentZoneDecontamination;
+using LightContainmentZoneDecontamination;
 using MEC;
 using PlayerRoles;
 using PlayerStatsSystem;
-using PluginAPI.Core;
-using PluginAPI.Core.Attributes;
-using PluginAPI.Enums;
-using PluginAPI.Events;
+using LabApi.Features.Wrappers;
+using LabApi.Features.Console;
 using Scp914;
 using System;
 using System.Collections.Generic;
@@ -17,6 +15,9 @@ using static TheRiptide.Translation;
 
 namespace TheRiptide
 {
+    /// <summary>
+    /// 死亡竞赛回合管理类
+    /// </summary>
     public class DmRound
     {
         public static DmRound Singleton { get; private set; }
@@ -32,6 +33,9 @@ namespace TheRiptide
         private CoroutineHandle round_5_minute_warning;
         private CoroutineHandle round_1_minute_warning;
 
+        /// <summary>
+        /// 游戏是否已开始
+        /// </summary>
         public static bool GameStarted
         {
             get => game_started;
@@ -39,15 +43,15 @@ namespace TheRiptide
             {
                 if (value == true)
                 {
-                    foreach (var player in Player.GetPlayers())
+                    foreach (var player in Player.List)
                         if (player.IsAlive)
-                            Killstreaks.Singleton.AddKillstreakStartEffects(player);
+                            Killstreaks.Singleton.AddKillstreakStartEffects(player.ReferenceHub);
                 }
                 else
                 {
-                    foreach (var player in Player.GetPlayers())
+                    foreach (var player in Player.List)
                         if (player.IsAlive)
-                            Lobby.ApplyGameNotStartedEffects(player);
+                            Lobby.ApplyGameNotStartedEffects(player.ReferenceHub);
                 }
                 game_started = value;
             }
@@ -67,48 +71,56 @@ namespace TheRiptide
                 }
                 catch (Exception ex)
                 {
-                    Log.Error("config override error: " + ex.ToString());
+                    Logger.Error("配置覆盖错误: " + ex.ToString());
                 }
             });
         }
 
+        /// <summary>
+        /// 初始化回合管理器
+        /// </summary>
         public void Init(MainConfig config)
         {
             this.config = config;
         }
 
+        /// <summary>
+        /// 等待玩家时调用
+        /// </summary>
         public void WaitingForPlayers()
         {
             game_ended = false;
             Database.Singleton.Checkpoint();
         }
 
-        [PluginEvent(ServerEventType.RoundStart)]
-        void OnRoundStart()
+        /// <summary>
+        /// 回合开始时调用
+        /// </summary>
+        public void OnRoundStart()
         {
             if (config.RoundTime > 5.0f)
-                round_5_minute_warning = Timing.CallDelayed(60.0f * (config.RoundTime - 5.0f), () => { BroadcastOverride.BroadcastLine(1, 30, BroadcastPriority.Medium, translation.RoundEnd5Minutes ); });
+                round_5_minute_warning = Timing.CallDelayed(60.0f * (config.RoundTime - 5.0f), () => { BroadcastOverride.BroadcastLine(1, 30, BroadcastPriority.Medium, translation.RoundEnd5Minutes); });
             if (config.RoundTime > 1.0f)
-                round_1_minute_warning = Timing.CallDelayed(60.0f * (config.RoundTime - 1.0f), () => { BroadcastOverride.BroadcastLine(1, 30, BroadcastPriority.Medium, translation.RoundEnd1Minute ); });
+                round_1_minute_warning = Timing.CallDelayed(60.0f * (config.RoundTime - 1.0f), () => { BroadcastOverride.BroadcastLine(1, 30, BroadcastPriority.Medium, translation.RoundEnd1Minute); });
             round_timer_handle = Timing.CallDelayed(60.0f * config.RoundTime, () =>
             {
                 try
                 {
-                    restart_handle = Timing.CallDelayed(config.RoundEndTime, () => Round.Restart(false));
+                    restart_handle = Timing.CallDelayed(config.RoundEndTime, () => LabApi.Features.Wrappers.Round.Restart(false));
                     Timing.CallPeriodically(config.RoundEndTime, 0.2f, () =>
                     {
-                        foreach (var p in Player.GetPlayers())
+                        foreach (var p in Player.List)
                             p.IsGodModeEnabled = true;
                     });
                     try { Statistics.DisplayRoundStats(); }
-                    catch (Exception ex) { Log.Error(ex.ToString()); }
+                    catch (Exception ex) { Logger.Error(ex.ToString()); }
                     try { Experiences.Singleton.SaveExperiences(); }
-                    catch (Exception ex) { Log.Error(ex.ToString()); }
+                    catch (Exception ex) { Logger.Error(ex.ToString()); }
                     try { Ranks.Singleton.CalculateAndSaveRanks(); }
-                    catch (Exception ex) { Log.Error(ex.ToString()); }
+                    catch (Exception ex) { Logger.Error(ex.ToString()); }
                     HintOverride.Refresh();
                     VoiceChat.Singleton.ForceGlobalTalkGlobalReceive();
-                    Server.Instance.SetRole(RoleTypeId.Spectator);
+                    Server.Host.SetRole(RoleTypeId.Spectator);
                     game_ended = true;
                     Tracking.Singleton.UpdateLeaderBoard();
                     LeaderBoard.Singleton.ReloadLeaderBoard();
@@ -117,66 +129,44 @@ namespace TheRiptide
                         LeaderBoard.Singleton.EnableTitle = false;
                         Timing.CallDelayed(Deathmatch.Singleton.leader_board_config.DisplayEndRoundDelay, () =>
                         {
-                            foreach (var p in Player.GetPlayers())
+                            foreach (var p in Player.List)
                                 if (p.IsReady)
-                                    LeaderBoard.Singleton.EnableLeaderBoardMode(p, Enum.IsDefined(typeof(LeaderBoardType), Deathmatch.Singleton.leader_board_config.LeaderBoardType) ? (LeaderBoardType)Deathmatch.Singleton.leader_board_config.LeaderBoardType : (LeaderBoardType)UnityEngine.Random.Range(0, Enum.GetValues(typeof(LeaderBoardType)).Length));
+                                    LeaderBoard.Singleton.EnableLeaderBoardMode(p.ReferenceHub, Enum.IsDefined(typeof(LeaderBoardType), Deathmatch.Singleton.leader_board_config.LeaderBoardType) ? (LeaderBoardType)Deathmatch.Singleton.leader_board_config.LeaderBoardType : (LeaderBoardType)UnityEngine.Random.Range(0, Enum.GetValues(typeof(LeaderBoardType)).Length));
                         });
                     }
                 }
                 catch (Exception ex)
                 {
-                    Log.Error("round end Error: " + ex.ToString());
+                    Logger.Error("回合结束错误: " + ex.ToString());
                 }
             });
 
-            Log.Info($"Server.Instance.IpAddress: {Server.Instance.IpAddress == null}");
-            Server.Instance.SetRole(RoleTypeId.Scp939);
-            Server.Instance.ReferenceHub.nicknameSync.SetNick(config.DummyPlayerName);
-            Server.Instance.Position = new Vector3(128.8f, 994.0f, 18.0f);
-            Round.IsLocked = true;
-            Warhead.IsLocked = true;
+            Logger.Info($"Server.Host.IpAddress: {Server.Host.IpAddress == null}");
+            Server.Host.SetRole(RoleTypeId.Scp939);
+            Server.Host.ReferenceHub.nicknameSync.SetNick(config.DummyPlayerName);
+            Server.Host.Position = new Vector3(128.8f, 994.0f, 18.0f);
+            LabApi.Features.Wrappers.Round.IsLocked = true;
+            LabApi.Features.Wrappers.Warhead.IsLocked = true;
             DecontaminationController.Singleton.NetworkDecontaminationOverride = DecontaminationController.DecontaminationStatus.Disabled;
             AttackerDamageHandler._ffMultiplier = 1.0f;
         }
 
-        [PluginEvent(ServerEventType.PlayerJoined)]
-        void OnPlayerJoined(Player player)
-        {
-            players.Add(player.PlayerId);
-            if (!player.DoNotTrack)
-                Database.Singleton.LoadConfig(player);
-            else
-                Timing.CallDelayed(1.0f, () => { HintOverride.Add(player, 0, translation.DntMsg, 30.0f); HintOverride.Refresh(player); });
-        }
-
-        [PluginEvent(ServerEventType.PlayerLeft)]
-        void OnPlayerLeft(Player player)
-        {
-            players.Remove(player.PlayerId);
-        }
-
-        [PluginEvent(ServerEventType.Scp914Activate)]
-        bool OnScp914Activate(Player player, Scp914KnobSetting knob_setting)
-        {
-            return false;
-        }
-
-        [PluginEvent(ServerEventType.RoundEndConditionsCheck)]
-        RoundEndConditionsCheckCancellationData OnRoundEndConditionsCheck(bool baseGameConditionsSatisfied)
-        {
-            return RoundEndConditionsCheckCancellationData.Override(false);
-        }
-
+        /// <summary>
+        /// 回合重启时调用
+        /// </summary>
         public void RoundRestart()
         {
             Timing.KillCoroutines(round_timer_handle, restart_handle, round_5_minute_warning, round_1_minute_warning);
-            Round.IsLocked = false;
+            LabApi.Features.Wrappers.Round.IsLocked = false;
         }
 
+        /// <summary>
+        /// 回合结束时调用
+        /// </summary>
         public void RoundEnd()
         {
             Timing.KillCoroutines(round_timer_handle, restart_handle, round_5_minute_warning, round_1_minute_warning);
-            Round.IsLocked = false;
+            LabApi.Features.Wrappers.Round.IsLocked = false;
         }
     }
 }

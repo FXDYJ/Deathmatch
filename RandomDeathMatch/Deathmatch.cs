@@ -1,11 +1,9 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
-
-using MEC;
-using PluginAPI.Core;
-using PluginAPI.Core.Attributes;
-using PluginAPI.Enums;
-using PluginAPI.Events;
+using LabApi.Events.CustomHandlers;
+using LabApi.Features;
+using LabApi.Features.Console;
+using LabApi.Loader.Features.Plugins;
 using PlayerRoles;
 using UnityEngine;
 using System.ComponentModel;
@@ -16,116 +14,106 @@ using PlayerStatsSystem;
 using static TheRiptide.Translation;
 using static RoundSummary;
 
-//todo voice and spectate cmd
 namespace TheRiptide
 {
+    /// <summary>
+    /// 主配置类
+    /// </summary>
     public class MainConfig
     {
+        /// <summary>
+        /// 是否启用插件
+        /// </summary>
         public bool IsEnabled { get; set; } = true;
 
-        [Description("round time in minutes")]
+        /// <summary>
+        /// 回合时间（分钟）
+        /// </summary>
+        [Description("回合时间（分钟）")]
         public float RoundTime { get; set; } = 20.0f;
-        [Description("round end in seconds")]
+
+        /// <summary>
+        /// 回合结束时间（秒）
+        /// </summary>
+        [Description("回合结束时间（秒）")]
         public float RoundEndTime { get; set; } = 30.0f;
 
-        public string DummyPlayerName { get; set; } = "[THE RIPTIDE]";
+        /// <summary>
+        /// 假人玩家名称
+        /// </summary>
+        public string DummyPlayerName { get; set; } = "[死亡竞赛]";
     }
 
+    /// <summary>
+    /// 全局参考配置类
+    /// </summary>
     public class GlobalReferenceConfig
     {
-        [Description("[AUTO GENERATED FILE] may contain types which no longer work. A reference list of types to be used in other configs (do not edit)")]
+        /// <summary>
+        /// [自动生成文件] 可能包含不再有效的类型。用于其他配置的类型参考列表（请勿编辑）
+        /// </summary>
+        [Description("[自动生成文件] 可能包含不再有效的类型。用于其他配置的类型参考列表（请勿编辑）")]
         public List<ItemType> AllItems { get; set; } = new List<ItemType>();
         public List<string> AllEffects { get; set; } = new List<string>();
         public List<AttachmentName> AllAttachments { get; set; } = new List<AttachmentName>();
     }
 
-    public class Deathmatch
+    /// <summary>
+    /// 死亡竞赛主插件类
+    /// </summary>
+    public class Deathmatch : Plugin
     {
         public static Deathmatch Singleton { get; private set; }
 
-        [PluginConfig("main_config.yml")]
-        public MainConfig config;
+        public override string Name { get; } = "死亡竞赛";
+        public override string Description { get; } = "SCP:SL 死亡竞赛游戏模式插件";
+        public override string Author { get; } = "The Riptide";
+        public override Version Version { get; } = new Version(2, 0, 0, 0);
+        public override Version RequiredApiVersion { get; } = new Version(LabApiProperties.CompiledVersion);
 
-        [PluginConfig("global_reference_config.yml")]
-        public GlobalReferenceConfig global_reference_config;
+        // 配置文件
+        public MainConfig config = new MainConfig();
+        public GlobalReferenceConfig global_reference_config = new GlobalReferenceConfig();
+        public RoomsConfig rooms_config = new RoomsConfig();
+        public KillstreakConfig killstreak_config = new KillstreakConfig();
+        public LoadoutConfig loadout_config = new LoadoutConfig();
+        public LobbyConfig lobby_config = new LobbyConfig();
+        public ExperienceConfig experience_config = new ExperienceConfig();
+        public RankConfig rank_config = new RankConfig();
+        public TrackingConfig tracking_config = new TrackingConfig();
+        public TranslationConfig translation_config = new TranslationConfig();
+        public AttachmentBlacklistConfig attachment_blacklist_config = new AttachmentBlacklistConfig();
+        public VoiceChatConfig voice_chat_config = new VoiceChatConfig();
+        public CleanupConfig cleanup_config = new CleanupConfig();
+        public LeaderBoardConfig leader_board_config = new LeaderBoardConfig();
 
-        [PluginConfig("rooms_config.yml")]
-        public RoomsConfig rooms_config;
-
-        [PluginConfig("killstreak_config.yml")]
-        public KillstreakConfig killstreak_config;
-
-        [PluginConfig("loadout_config.yml")]
-        public LoadoutConfig loadout_config;
-
-        [PluginConfig("lobby_config.yml")]
-        public LobbyConfig lobby_config;
-
-        [PluginConfig("experience_config.yml")]
-        public ExperienceConfig experience_config;
-
-        [PluginConfig("rank_config.yml")]
-        public RankConfig rank_config;
-
-        [PluginConfig("tracking_config.yml")]
-        public TrackingConfig tracking_config;
-
-        [PluginConfig("translation_config.yml")]
-        public TranslationConfig translation_config;
-
-        [PluginConfig("attachment_blacklist_config.yml")]
-        public AttachmentBlacklistConfig attachment_blacklist_config;
-
-        [PluginConfig("voice_chat_config.yml")]
-        public VoiceChatConfig voice_chat_config;
-
-        [PluginConfig("cleanup_config.yml")]
-        public CleanupConfig cleanup_config;
-
-        [PluginConfig("leader_board.yml")]
-        public LeaderBoardConfig leader_board_config;
+        // 事件处理器
+        private DeathmatchEventsHandler eventsHandler;
 
         public Deathmatch()
         {
             Singleton = this;
         }
 
-        public void Start()
+        public override void Enable()
         {
-            Database.Singleton.Load(PluginHandler.Get(this).MainConfigPath);
+            if (!config.IsEnabled)
+                return;
 
-            if (config.IsEnabled)
-                EventManager.RegisterEvents(this);
-            EventManager.RegisterEvents<DmRound>(this);
-            //dependencies
-            EventManager.RegisterEvents<InventoryMenu>(this);
-            EventManager.RegisterEvents<BroadcastOverride>(this);
-            EventManager.RegisterEvents<FacilityManager>(this);
-            EventManager.RegisterEvents<BadgeOverride>(this);
-            EventManager.RegisterEvents<HintOverride>(this);
+            Logger.Info("正在加载死亡竞赛插件...");
+
+            // 加载配置
+            LoadConfigs();
+
+            // 初始化数据库
+            Database.Singleton.Load(ConfigPath);
+
+            // 注册事件处理器
+            eventsHandler = new DeathmatchEventsHandler();
+            CustomHandlersManager.RegisterEventsHandler(eventsHandler);
+
+            // 初始化所有功能模块
             BadgeOverride.Singleton.Init(2);
-
-            //features
-            EventManager.RegisterEvents<Statistics>(this);
-            EventManager.RegisterEvents<Killfeeds>(this);
-            EventManager.RegisterEvents<Killstreaks>(this);
-            EventManager.RegisterEvents<Loadouts>(this);
-            EventManager.RegisterEvents<Lobby>(this);
-            EventManager.RegisterEvents<Rooms>(this);
-            if (rank_config.IsEnabled)
-                EventManager.RegisterEvents<Ranks>(this);
-            if (experience_config.IsEnabled)
-                EventManager.RegisterEvents<Experiences>(this);
-            if (tracking_config.IsEnabled)
-                EventManager.RegisterEvents<Tracking>(this);
-            if (attachment_blacklist_config.IsEnabled)
-                EventManager.RegisterEvents<AttachmentBlacklist>(this);
-            if (voice_chat_config.IsEnabled)
-                EventManager.RegisterEvents<VoiceChat>(this);
-            if (cleanup_config.IsEnabled)
-                EventManager.RegisterEvents<Cleanup>(this);
-            if (leader_board_config.IsEnabled)
-                EventManager.RegisterEvents<LeaderBoard>(this);
 
             DmRound.Singleton.Init(config);
             Statistics.Init();
@@ -151,120 +139,41 @@ namespace TheRiptide
             translation = translation_config;
             DeathmatchMenu.Singleton.SetupMenus();
 
-            GameCore.ConfigFile.OnConfigReloaded += DmRound.Singleton.OnConfigReloaded;
+            Logger.Info("死亡竞赛插件加载完成！");
         }
 
-        public void Stop()
+        public override void Disable()
         {
+            Logger.Info("正在卸载死亡竞赛插件...");
+
             Database.Singleton.UnLoad();
 
-            //features
-            EventManager.UnregisterEvents<LeaderBoard>(this);
-            EventManager.UnregisterEvents<Cleanup>(this);
-            EventManager.UnregisterEvents<VoiceChat>(this);
-            EventManager.UnregisterEvents<AttachmentBlacklist>(this);
-            EventManager.UnregisterEvents<Tracking>(this);
-            EventManager.UnregisterEvents<Experiences>(this);
-            EventManager.UnregisterEvents<Ranks>(this);
-            EventManager.UnregisterEvents<Rooms>(this);
-            EventManager.UnregisterEvents<Lobby>(this);
-            EventManager.UnregisterEvents<Loadouts>(this);
-            EventManager.UnregisterEvents<Killstreaks>(this);
-            EventManager.UnregisterEvents<Killfeeds>(this);
-            EventManager.UnregisterEvents<Statistics>(this);
-
-            //dependencies
-            EventManager.UnregisterEvents<HintOverride>(this);
-            EventManager.UnregisterEvents<BadgeOverride>(this);
-            EventManager.UnregisterEvents<FacilityManager>(this);
-            EventManager.UnregisterEvents<BroadcastOverride>(this);
-            EventManager.UnregisterEvents<InventoryMenu>(this);
-
-            EventManager.UnregisterEvents(this);
-            EventManager.UnregisterEvents<DmRound>(this);
+            if (eventsHandler != null)
+            {
+                CustomHandlersManager.UnregisterEventsHandler(eventsHandler);
+                eventsHandler = null;
+            }
 
             DeathmatchMenu.Singleton.ClearMenus();
 
-            GameCore.ConfigFile.OnConfigReloaded -= DmRound.Singleton.OnConfigReloaded;
+            Logger.Info("死亡竞赛插件已卸载！");
         }
 
-        [PluginEntryPoint("Deathmatch", "1.0", "needs no explanation", "The Riptide")]
-        void EntryPoint()
+        /// <summary>
+        /// 加载所有配置文件
+        /// </summary>
+        private void LoadConfigs()
         {
-            if (!config.IsEnabled)
-                return;
-            Start();
+            // 这里需要实现配置文件的加载逻辑
+            // LabAPI 使用不同的配置系统，需要适配
         }
 
-        [PluginUnload]
-        void Unload()
+        /// <summary>
+        /// 检查玩家是否有效
+        /// </summary>
+        public static bool IsPlayerValid(LabApi.Features.Wrappers.Player player)
         {
-            Stop();
-        }
-
-        [PluginEvent(ServerEventType.MapGenerated)]
-        public void OnMapGenerated()
-        {
-            FacilityManager.MapGenerated();
-            Lobby.Singleton.MapGenerated();
-            if (rank_config.IsEnabled)
-                Ranks.Singleton.MapGenerated();
-            if (leader_board_config.IsEnabled)
-                LeaderBoard.Singleton.MapGenerated();
-        }
-
-        [PluginEvent(ServerEventType.WaitingForPlayers)]
-        public void OnWaitingForPlayers()
-        {
-            GenerateGlobalReferenceConfig();
-            DmRound.Singleton.WaitingForPlayers();
-            if (tracking_config.IsEnabled)
-                Tracking.Singleton.WaitingForPlayers();
-            if (voice_chat_config.IsEnabled)
-                VoiceChat.Singleton.WaitingForPlayers();
-        }
-
-        [PluginEvent(ServerEventType.RoundEnd)]
-        public void OnRoundEnd(LeadingTeam team)
-        {
-            DmRound.Singleton.RoundEnd();
-        }
-
-        [PluginEvent(ServerEventType.RoundRestart)]
-        public void OnRoundRestart()
-        {
-            DmRound.Singleton.RoundRestart();
-            FacilityManager.RoundRestart();
-            Rooms.Singleton.RoundRestart();
-            if (cleanup_config.IsEnabled)
-                Cleanup.Singleton.RoundRestart();
-        }
-
-        public static bool IsPlayerValid(Player player)
-        {
-            return DmRound.players.Contains(player.PlayerId);
-        }
-
-        private void GenerateGlobalReferenceConfig()
-        {
-            try
-            {
-                global_reference_config.AllItems.Clear();
-                foreach (ItemType item in Enum.GetValues(typeof(ItemType)))
-                    global_reference_config.AllItems.Add(item);
-
-                global_reference_config.AllEffects.Clear();
-                foreach (StatusEffectBase effect in Server.Instance.GameObject.GetComponentsInChildren<StatusEffectBase>(true))
-                    global_reference_config.AllEffects.Add(effect.name);
-                global_reference_config.AllAttachments.Clear();
-                foreach (AttachmentName name in Enum.GetValues(typeof(AttachmentName)))
-                    global_reference_config.AllAttachments.Add(name);
-                PluginHandler.Get(this).SaveConfig(this, nameof(global_reference_config));
-            }
-            catch(Exception e)
-            {
-                Log.Error("Global reference config error delete config if this error is common\n " + e.ToString(), "NW API ERROR");
-            }
+            return DmRound.players.Contains(player.ReferenceHub.PlayerId);
         }
     }
 }
