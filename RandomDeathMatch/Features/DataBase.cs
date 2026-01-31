@@ -432,7 +432,7 @@ CREATE INDEX idx_ranks_rating ON ranks(rating);
         /// <summary>
         /// 加载玩家配置
         /// </summary>
-        public void LoadConfig(int playerId, string oderId)
+        public void LoadConfig(int playerId, string userId)
         {
             DbDelayedAsync(async () =>
             {
@@ -444,7 +444,7 @@ CREATE INDEX idx_ranks_rating ON ranks(rating);
                         string sql = "SELECT * FROM configs WHERE user_id = @userId";
                         using (var command = new MySqlCommand(sql, connection))
                         {
-                            command.Parameters.AddWithValue("@userId", oderId);
+                            command.Parameters.AddWithValue("@userId", userId);
                             using (var reader = await command.ExecuteReaderAsync())
                             {
                                 if (await reader.ReadAsync())
@@ -453,7 +453,7 @@ CREATE INDEX idx_ranks_rating ON ranks(rating);
                                     Timing.CallDelayed(0.0f, () =>
                                     {
                                         // 这里需要根据实际情况应用配置
-                                        Logger.Debug($"已加载玩家配置: {oderId}");
+                                        Logger.Debug($"已加载玩家配置: {userId}");
                                     });
                                 }
                             }
@@ -470,7 +470,7 @@ CREATE INDEX idx_ranks_rating ON ranks(rating);
         /// <summary>
         /// 保存玩家配置
         /// </summary>
-        public void SaveConfig(string oderId, Config config)
+        public void SaveConfig(string userId, Config config)
         {
             DbAsync(async () =>
             {
@@ -486,7 +486,7 @@ CREATE INDEX idx_ranks_rating ON ranks(rating);
                                       rage_enabled = @rage, role = @role, killstreak_mode = @killstreak";
                         using (var command = new MySqlCommand(sql, connection))
                         {
-                            command.Parameters.AddWithValue("@userId", oderId);
+                            command.Parameters.AddWithValue("@userId", userId);
                             command.Parameters.AddWithValue("@primary", (int)config.Primary);
                             command.Parameters.AddWithValue("@secondary", (int)config.Secondary);
                             command.Parameters.AddWithValue("@tertiary", (int)config.Tertiary);
@@ -511,7 +511,7 @@ CREATE INDEX idx_ranks_rating ON ranks(rating);
         /// <summary>
         /// 加载玩家排名
         /// </summary>
-        public void LoadRank(string oderId, Action<Rank> callback)
+        public void LoadRank(string userId, Action<Rank> callback)
         {
             DbDelayedAsync(async () =>
             {
@@ -523,7 +523,7 @@ CREATE INDEX idx_ranks_rating ON ranks(rating);
                         string sql = "SELECT * FROM ranks WHERE user_id = @userId";
                         using (var command = new MySqlCommand(sql, connection))
                         {
-                            command.Parameters.AddWithValue("@userId", oderId);
+                            command.Parameters.AddWithValue("@userId", userId);
                             using (var reader = await command.ExecuteReaderAsync())
                             {
                                 Rank rank = null;
@@ -593,7 +593,7 @@ CREATE INDEX idx_ranks_rating ON ranks(rating);
         /// <summary>
         /// 加载玩家经验
         /// </summary>
-        public void LoadExperience(string oderId, Action<Experience> callback)
+        public void LoadExperience(string userId, Action<Experience> callback)
         {
             DbDelayedAsync(async () =>
             {
@@ -605,7 +605,7 @@ CREATE INDEX idx_ranks_rating ON ranks(rating);
                         string sql = "SELECT * FROM experiences WHERE user_id = @userId";
                         using (var command = new MySqlCommand(sql, connection))
                         {
-                            command.Parameters.AddWithValue("@userId", oderId);
+                            command.Parameters.AddWithValue("@userId", userId);
                             using (var reader = await command.ExecuteReaderAsync())
                             {
                                 Experience xp = null;
@@ -635,7 +635,7 @@ CREATE INDEX idx_ranks_rating ON ranks(rating);
         /// <summary>
         /// 保存玩家经验
         /// </summary>
-        public void SaveExperience(string oderId, Experience xp)
+        public void SaveExperience(string userId, Experience xp)
         {
             DbAsync(async () =>
             {
@@ -650,7 +650,7 @@ CREATE INDEX idx_ranks_rating ON ranks(rating);
                                       value = @value, level = @level, stage = @stage, tier = @tier";
                         using (var command = new MySqlCommand(sql, connection))
                         {
-                            command.Parameters.AddWithValue("@userId", oderId);
+                            command.Parameters.AddWithValue("@userId", userId);
                             command.Parameters.AddWithValue("@value", xp.Value);
                             command.Parameters.AddWithValue("@level", xp.Level);
                             command.Parameters.AddWithValue("@stage", xp.Stage);
@@ -673,7 +673,7 @@ CREATE INDEX idx_ranks_rating ON ranks(rating);
         /// <summary>
         /// 更新排行榜
         /// </summary>
-        public void UpdateLeaderBoard(string oderId, LeaderBoard lb)
+        public void UpdateLeaderBoard(string userId, LeaderBoard lb)
         {
             DbAsync(async () =>
             {
@@ -689,7 +689,7 @@ CREATE INDEX idx_ranks_rating ON ranks(rating);
                                       killstreak_tag = @tag, total_play_time = @time";
                         using (var command = new MySqlCommand(sql, connection))
                         {
-                            command.Parameters.AddWithValue("@userId", oderId);
+                            command.Parameters.AddWithValue("@userId", userId);
                             command.Parameters.AddWithValue("@kills", lb.TotalKills);
                             command.Parameters.AddWithValue("@killstreak", lb.HighestKillstreak);
                             command.Parameters.AddWithValue("@tag", lb.KillstreakTag);
@@ -712,7 +712,7 @@ CREATE INDEX idx_ranks_rating ON ranks(rating);
         /// <summary>
         /// 删除玩家数据
         /// </summary>
-        public void DeleteData(string oderId)
+        public void DeleteData(string userId)
         {
             DbAsync(async () =>
             {
@@ -729,12 +729,12 @@ CREATE INDEX idx_ranks_rating ON ranks(rating);
                             string sql = $"DELETE FROM {table} WHERE user_id = @userId";
                             using (var command = new MySqlCommand(sql, connection))
                             {
-                                command.Parameters.AddWithValue("@userId", oderId);
+                                command.Parameters.AddWithValue("@userId", userId);
                                 await command.ExecuteNonQueryAsync();
                             }
                         }
                         
-                        Logger.Info($"已删除玩家数据: {oderId}");
+                        Logger.Info($"已删除玩家数据: {userId}");
                     }
                 }
                 catch (Exception ex)

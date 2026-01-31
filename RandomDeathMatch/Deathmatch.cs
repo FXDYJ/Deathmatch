@@ -161,11 +161,29 @@ namespace TheRiptide
 
         /// <summary>
         /// 加载所有配置文件
+        /// LabAPI会自动加载配置，这里初始化翻译配置
         /// </summary>
         private void LoadConfigs()
         {
-            // 这里需要实现配置文件的加载逻辑
-            // LabAPI 使用不同的配置系统，需要适配
+            // LabAPI 插件基类会自动处理配置加载
+            // 这里只需要确保翻译配置已设置
+            translation = translation_config;
+            
+            // 初始化各功能模块的单例
+            new DmRound();
+            new Rooms();
+            new Killstreaks();
+            new Loadouts();
+            new Lobby();
+            new Ranks();
+            new Experiences();
+            new Tracking();
+            new AttachmentBlacklist();
+            new VoiceChat();
+            new Cleanup();
+            new LeaderBoard();
+            new BadgeOverride();
+            new DeathmatchMenu();
         }
 
         /// <summary>

@@ -36,8 +36,8 @@ namespace TheRiptide
         public string FirearmKill { get; set; } = "{killer} 用 {gun} 射中了 {victim} 的 {hitbox}";
         public string ExplosionKill { get; set; } = "{killer} 炸死了 {victim}";
         public string ExplosionSelfKill { get; set; } = "{victim} 被自己的 <b><color=#eb0d47>手榴弹</color></b> 炸死了";
-        public string JailbirdHeadKill { get; set; } = "{killer} 用 <b><color=#eb0d47>越狱鸟</color></b> 砸中了 {victim} 的 {hitbox}";
-        public string JailbirdNormalKill { get; set; } = "{killer} 用 <b><color=#eb0d47>越狱鸟</color></b> 拍中了 {victim} 的 {hitbox}";
+        public string JailbirdHeadKill { get; set; } = "{killer} 用 <b><color=#eb0d47>囚鸟</color></b> 砸中了 {victim} 的 {hitbox}";
+        public string JailbirdNormalKill { get; set; } = "{killer} 用 <b><color=#eb0d47>囚鸟</color></b> 拍中了 {victim} 的 {hitbox}";
         public string Scp018Kill { get; set; } = "{killer} 用 <b><color=#eb0d47>SCP-018</color></b> 砸死了 {victim}";
         public string Scp018SelfKill { get; set; } = "{victim} 因为接不住自己的弹力球而送了命";
         public string DistruptorKill { get; set; } = "{killer} 用 <b><color=#eb0d47>粒子干扰器</color></b> 击中了 {victim} 的 {hitbox} 并将其分解";
