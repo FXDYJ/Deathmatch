@@ -3,10 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Diagnostics;
 
-using PluginAPI.Core;
+using LabApi.Features.Wrappers;
+using LabApi.Features.Console;
 using MEC;
-using PluginAPI.Core.Attributes;
-using PluginAPI.Enums;
 
 namespace TheRiptide
 {
@@ -163,8 +162,6 @@ namespace TheRiptide
                     handle = Timing.RunCoroutine(_Update(player));
                 }
             }
-
-
             public IEnumerator<float> _Update(Player player)
             {
                 float delta = 1.0f;
@@ -181,51 +178,49 @@ namespace TheRiptide
 
         public static void SetEvenLineSizes(Player player, int line_count)
         {
-            if (broadcast_info.ContainsKey(player.PlayerId))
-                broadcast_info[player.PlayerId].SetEvenLineSizes(line_count);
+            if (broadcast_info.ContainsKey(player.ReferenceHub.PlayerId))
+                broadcast_info[player.ReferenceHub.PlayerId].SetEvenLineSizes(line_count);
         }
 
         public static void SetCustomLineSizes(Player player, IEnumerable<int> sizes)
         {
-            if (broadcast_info.ContainsKey(player.PlayerId))
-                broadcast_info[player.PlayerId].SetCustomLineSizes(sizes);
+            if (broadcast_info.ContainsKey(player.ReferenceHub.PlayerId))
+                broadcast_info[player.ReferenceHub.PlayerId].SetCustomLineSizes(sizes);
         }
 
-        [PluginEvent(ServerEventType.PlayerJoined)]
         void OnPlayerJoined(Player player)
         {
-            if (!broadcast_info.ContainsKey(player.PlayerId))
-                broadcast_info.Add(player.PlayerId, new BroadcastInfo());
+            if (!broadcast_info.ContainsKey(player.ReferenceHub.PlayerId))
+                broadcast_info.Add(player.ReferenceHub.PlayerId, new BroadcastInfo());
             Killfeeds.SetBroadcastKillfeedLayout(player);
         }
 
-        [PluginEvent(ServerEventType.PlayerLeft)]
         void OnPlayerLeft(Player player)
         {
-            if (broadcast_info.ContainsKey(player.PlayerId))
-                broadcast_info.Remove(player.PlayerId);
+            if (broadcast_info.ContainsKey(player.ReferenceHub.PlayerId))
+                broadcast_info.Remove(player.ReferenceHub.PlayerId);
         }
 
         public static void BroadcastLine(Player player, int line, float duration, BroadcastPriority priority, string msg)
         {
-            if (broadcast_info.ContainsKey(player.PlayerId))
-                broadcast_info[player.PlayerId].BroadcastLine(line, duration, priority, msg);
+            if (broadcast_info.ContainsKey(player.ReferenceHub.PlayerId))
+                broadcast_info[player.ReferenceHub.PlayerId].BroadcastLine(line, duration, priority, msg);
         }
 
         public static void BroadcastLine(int line, float duration, BroadcastPriority priority, string msg)
         {
-            foreach (Player player in Player.GetPlayers())
+            foreach (Player player in Player.List)
                 if (player.IsReady)
                     BroadcastLine(player, line, duration, priority, msg);
         }
 
         public static void BroadcastLines(Player player, int line, float duration, BroadcastPriority priority, List<string> msgs)
         {
-            if (broadcast_info.ContainsKey(player.PlayerId))
+            if (broadcast_info.ContainsKey(player.ReferenceHub.PlayerId))
             {
                 foreach (string msg in msgs)
                 {
-                    broadcast_info[player.PlayerId].BroadcastLine(line, duration, priority, msg);
+                    broadcast_info[player.ReferenceHub.PlayerId].BroadcastLine(line, duration, priority, msg);
                     line++;
                 }
             }
@@ -233,46 +228,46 @@ namespace TheRiptide
 
         public static void BroadcastLines(int line, float duration, BroadcastPriority priority, List<string> msgs)
         {
-            foreach (Player player in Player.GetPlayers())
+            foreach (Player player in Player.List)
                 if (player.IsReady)
                     BroadcastLines(player, line, duration, priority, msgs);
         }
 
         public static void ClearLines(Player player, BroadcastPriority priority)
         {
-            if (broadcast_info.ContainsKey(player.PlayerId))
-                broadcast_info[player.PlayerId].ClearLines(priority);
+            if (broadcast_info.ContainsKey(player.ReferenceHub.PlayerId))
+                broadcast_info[player.ReferenceHub.PlayerId].ClearLines(priority);
         }
 
         public static void ClearLines(BroadcastPriority priority)
         {
-            foreach (Player player in Player.GetPlayers())
+            foreach (Player player in Player.List)
                 if (player.IsReady)
                     ClearLines(player, priority);
         }
 
         public static void ClearLine(Player player, int line, BroadcastPriority priority)
         {
-            if (broadcast_info.ContainsKey(player.PlayerId))
-                broadcast_info[player.PlayerId].ClearLine(line, priority);
+            if (broadcast_info.ContainsKey(player.ReferenceHub.PlayerId))
+                broadcast_info[player.ReferenceHub.PlayerId].ClearLine(line, priority);
         }
 
         public static void ClearLine(int line, BroadcastPriority priority)
         {
-            foreach (Player player in Player.GetPlayers())
+            foreach (Player player in Player.List)
                 if (player.IsReady)
                     ClearLine(player, line, priority);
         }
 
         public static void UpdateIfDirty(Player player)
         {
-            if (broadcast_info.ContainsKey(player.PlayerId))
-                broadcast_info[player.PlayerId].UpdateIfDirty(player);
+            if (broadcast_info.ContainsKey(player.ReferenceHub.PlayerId))
+                broadcast_info[player.ReferenceHub.PlayerId].UpdateIfDirty(player);
         }
 
         public static void UpdateAllDirty()
         {
-            foreach (Player player in Player.GetPlayers())
+            foreach (Player player in Player.List)
                 if (player.IsReady)
                     UpdateIfDirty(player);
         }

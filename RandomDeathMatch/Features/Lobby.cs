@@ -4,10 +4,9 @@ using MEC;
 using Mirror;
 using PlayerRoles;
 using PlayerStatsSystem;
-using PluginAPI.Core;
-using PluginAPI.Core.Attributes;
-using PluginAPI.Enums;
-using PluginAPI.Events;
+using LabApi.Features.Wrappers;
+using LabApi.Features.Console;
+
 using Respawning;
 using System;
 using System.Collections.Generic;
@@ -18,18 +17,51 @@ using static TheRiptide.Translation;
 
 namespace TheRiptide
 {
+    /// <summary>
+    /// 大厅配置类
+    /// </summary>
     public class LobbyConfig
     {
+        /// <summary>
+        /// 出生点颜色 - 红色分量
+        /// </summary>
         public int SpawnColorRed{ get; set; } = 67;
+        
+        /// <summary>
+        /// 出生点颜色 - 绿色分量
+        /// </summary>
         public int SpawnColorGreen { get; set; } = 191;
+        
+        /// <summary>
+        /// 出生点颜色 - 蓝色分量
+        /// </summary>
         public int SpawnColorBlue { get; set; } = 240;
+        
+        /// <summary>
+        /// 出生点灯光强度
+        /// </summary>
         public float SpawnLightIntensity { get; set; } = 100.00f;
-        [Description("max players should be less than SpawnDimX x SpawnDimY")]
+        
+        /// <summary>
+        /// 出生点X维度，最大玩家数应小于 SpawnDimX x SpawnDimY
+        /// </summary>
+        [Description("最大玩家数应小于 SpawnDimX x SpawnDimY")]
         public int SpawnDimX { get; set; } = 8;
+        
+        /// <summary>
+        /// 出生点Y维度
+        /// </summary>
         public int SpawnDimY { get; set; } = 8;
+        
+        /// <summary>
+        /// 出生保护时间（秒）
+        /// </summary>
         public float SpawnProtection { get; set; } = 3.0f;
     }
 
+    /// <summary>
+    /// 大厅管理类
+    /// </summary>
     class Lobby
     {
         public static Lobby Singleton { get; private set; }
@@ -72,62 +104,59 @@ namespace TheRiptide
             round_started = false;
 
             //foreach (var c in NetworkManager.singleton.spawnPrefabs)
-            //    Log.Info(c.name);
+            //    Logger.Info(c.name);
         }
 
-        [PluginEvent(ServerEventType.PlayerJoined)]
         void OnPlayerJoined(Player player)
         {
-            if (!player_spawns.ContainsKey(player.PlayerId))
+            if (!player_spawns.ContainsKey(player.ReferenceHub.PlayerId))
             {
-                player_spawns.Add(player.PlayerId, new Spawn());
-                player_spawns[player.PlayerId].spawn_room = avaliable_spawn_rooms.First();
+                player_spawns.Add(player.ReferenceHub.PlayerId, new Spawn());
+                player_spawns[player.ReferenceHub.PlayerId].spawn_room = avaliable_spawn_rooms.First();
                 avaliable_spawn_rooms.Remove(avaliable_spawn_rooms.First());
             }
 
             if (!round_started)
             {
                 round_started = true;
-                MEC.Timing.CallDelayed(1.0f, () => { Round.Start(); });
+                MEC.Timing.CallDelayed(1.0f, () => { LabApi.Features.Wrappers.Round.Start(); });
             }
             else
             {
                 MEC.Timing.CallDelayed(1.0f, () => { if (!player.IsAlive) { RespawnPlayer(player); } });
             }
 
-            if(Player.Count == 1)
+            if(Player.List.Count() == 1)
             {
                 DmRound.GameStarted = false;
             }
-            else if (Player.Count == 2)
+            else if (Player.List.Count() == 2)
             {
-                foreach (var p in Player.GetPlayers())
+                foreach (var p in Player.List)
                     if (p.IsAlive)
-                        p.EffectsManager.DisableAllEffects();
+                        p.ReferenceHub.playerEffectsController.DisableAllEffects();
             }
         }
 
-        [PluginEvent(ServerEventType.PlayerLeft)]
         void OnPlayerLeft(Player player)
         {
-            if (player_spawns.ContainsKey(player.PlayerId))
+            if (player_spawns.ContainsKey(player.ReferenceHub.PlayerId))
             {
-                avaliable_spawn_rooms.Add(player_spawns[player.PlayerId].spawn_room);
-                if (!player.DoNotTrack)
+                avaliable_spawn_rooms.Add(player_spawns[player.ReferenceHub.PlayerId].spawn_room);
+                if (!player.ReferenceHub.authManager.DoNotTrack)
                     Database.Singleton.SaveConfigSpawn(player);
-                player_spawns.Remove(player.PlayerId);
+                player_spawns.Remove(player.ReferenceHub.PlayerId);
             }
 
-            if(Player.Count == 2)
+            if(Player.List.Count() == 2)
             {
                 DmRound.GameStarted = false;
-                foreach (var p in Player.GetPlayers())
+                foreach (var p in Player.List)
                     if (p.IsAlive)
                         ApplyGameNotStartedEffects(player);
             }
         }
 
-        [PluginEvent(ServerEventType.PlayerDeath)]
         void OnPlayerDeath(Player target, Player killer, DamageHandlerBase damage)
         {
             if (target == null)
@@ -144,13 +173,12 @@ namespace TheRiptide
             BroadcastOverride.UpdateAllDirty();
         }
 
-        [PluginEvent(ServerEventType.PlayerChangeSpectator)]
         void OnPlayerChangeSpectator(Player player, Player old_target, Player new_target)
         {
-            if (player == null || !player_spawns.ContainsKey(player.PlayerId))
+            if (player == null || !player_spawns.ContainsKey(player.ReferenceHub.PlayerId))
                 return;
 
-            Spawn spawn = player_spawns[player.PlayerId];
+            Spawn spawn = player_spawns[player.ReferenceHub.PlayerId];
 
             if (!spawn.in_spectator_mode)
             {
@@ -161,7 +189,7 @@ namespace TheRiptide
             }
             else
             {
-                if (new_target == null || new_target.PlayerId == Server.Instance.PlayerId)
+                if (new_target == null || new_target.PlayerId == Server.Host.PlayerId)
                 {
                     spawn.in_spectator_mode = false;
                     RespawnPlayer(player);
@@ -169,13 +197,12 @@ namespace TheRiptide
             }
         }
 
-        [PluginEvent(ServerEventType.PlayerChangeRole)]
         bool OnPlayerChangeRole(Player player, PlayerRoleBase old_role, RoleTypeId new_role, RoleChangeReason reason)
         {
-            if (player == null || !player_spawns.ContainsKey(player.PlayerId))
+            if (player == null || !player_spawns.ContainsKey(player.ReferenceHub.PlayerId))
                 return true;
 
-            Spawn spawn = player_spawns[player.PlayerId];
+            Spawn spawn = player_spawns[player.ReferenceHub.PlayerId];
             if (new_role != spawn.role && new_role != RoleTypeId.Spectator && new_role != RoleTypeId.Overwatch && new_role != RoleTypeId.Tutorial)
             {
                 Timing.CallDelayed(0.0f, () => { player.SetRole(spawn.role, RoleChangeReason.RemoteAdmin); });
@@ -187,13 +214,12 @@ namespace TheRiptide
             }
         }
 
-        [PluginEvent(ServerEventType.PlayerSpawn)]
         void OnPlayerSpawn(Player player, RoleTypeId role)
         {
-            if (!player_spawns.ContainsKey(player.PlayerId))
+            if (!player_spawns.ContainsKey(player.ReferenceHub.PlayerId))
                 return;
 
-            Spawn spawn = player_spawns[player.PlayerId];
+            Spawn spawn = player_spawns[player.ReferenceHub.PlayerId];
 
             if (role == spawn.role)
             {
@@ -210,14 +236,14 @@ namespace TheRiptide
                     Timing.KillCoroutines(spawn.teleport_handle);
                     spawn.teleport_handle = Timing.CallDelayed(7.0f, () =>
                     {
-                        if (player == null || !player_spawns.ContainsKey(player.PlayerId))
+                        if (player == null || !player_spawns.ContainsKey(player.ReferenceHub.PlayerId))
                             return;
-                        if (Player.GetPlayers().Count == 1)
+                        if (Player.List.Count == 1)
                         {
                             BroadcastOverride.BroadcastLines(player, 1, 1500.0f, BroadcastPriority.Low, translation.WaitingForPlayers);
                             BroadcastOverride.UpdateIfDirty(player);
                         }
-                        else if (Player.GetPlayers().Count >= 2 && !DmRound.GameStarted)
+                        else if (Player.List.Count >= 2 && !DmRound.GameStarted)
                         {
                             DmRound.GameStarted = true;
                             BroadcastOverride.ClearLines(BroadcastPriority.Low);
@@ -236,13 +262,11 @@ namespace TheRiptide
             }
         }
 
-        [PluginEvent(ServerEventType.TeamRespawn)]
         bool OnRespawn(TeamRespawnEvent _)
         {
             return false;
         }
 
-        [PluginEvent(ServerEventType.PlayerEscape)]
         bool OnPlayerEscape(Player player, RoleTypeId role)
         {
             return false;
@@ -250,17 +274,17 @@ namespace TheRiptide
 
         public Spawn GetSpawn(Player player)
         {
-            return player_spawns[player.PlayerId];
+            return player_spawns[player.ReferenceHub.PlayerId];
         }
 
         public void CancelTeleport(Player player)
         {
-            Timing.KillCoroutines(player_spawns[player.PlayerId].teleport_handle);
+            Timing.KillCoroutines(player_spawns[player.ReferenceHub.PlayerId].teleport_handle);
         }
 
         public void TeleportOutOfSpawn(Player player)
         {
-            Spawn spawn = player_spawns[player.PlayerId];
+            Spawn spawn = player_spawns[player.ReferenceHub.PlayerId];
 
             if (!Loadouts.ValidateLoadout(player))
             {
@@ -277,12 +301,12 @@ namespace TheRiptide
                         Timing.KillCoroutines(spawn.teleport_handle);
                         spawn.teleport_handle = Timing.CallDelayed(3.0f, () =>
                         {
-                            if (Player.GetPlayers().Count == 1)
+                            if (Player.List.Count == 1)
                             {
                                 BroadcastOverride.BroadcastLines(player, 1, 1500.0f, BroadcastPriority.Low, translation.WaitingForPlayers);
                                 BroadcastOverride.UpdateIfDirty(player);
                             }
-                            else if (Player.GetPlayers().Count >= 2 && !DmRound.GameStarted)
+                            else if (Player.List.Count >= 2 && !DmRound.GameStarted)
                             {
                                 DmRound.GameStarted = true;
                                 BroadcastOverride.ClearLines(BroadcastPriority.Low);
@@ -296,12 +320,12 @@ namespace TheRiptide
                 }
                 else
                 {
-                    if (Player.GetPlayers().Count == 1)
+                    if (Player.List.Count == 1)
                     {
                         BroadcastOverride.BroadcastLines(player, 1, 1500.0f, BroadcastPriority.Low, translation.WaitingForPlayers);
                         BroadcastOverride.UpdateIfDirty(player);
                     }
-                    else if (Player.GetPlayers().Count >= 2 && !DmRound.GameStarted)
+                    else if (Player.List.Count >= 2 && !DmRound.GameStarted)
                     {
                         DmRound.GameStarted = true;
                         BroadcastOverride.ClearLines(BroadcastPriority.Low);
@@ -313,17 +337,17 @@ namespace TheRiptide
 
         public bool InSpawn(Player player)
         {
-            return player_spawns[player.PlayerId].in_spawn;
+            return player_spawns[player.ReferenceHub.PlayerId].in_spawn;
         }
 
         public void SetRole(Player player, RoleTypeId role)
         {
-            player_spawns[player.PlayerId].role = role;
+            player_spawns[player.ReferenceHub.PlayerId].role = role;
         }
 
         public void SetSpectatorMode(Player player, bool is_spectator)
         {
-            player_spawns[player.PlayerId].in_spectator_mode = is_spectator;
+            player_spawns[player.ReferenceHub.PlayerId].in_spectator_mode = is_spectator;
             if(is_spectator)
             {
                 BroadcastOverride.ClearLines(player, BroadcastPriority.High);
@@ -380,7 +404,7 @@ namespace TheRiptide
         {
             if (player.Role == RoleTypeId.Spectator)
             {
-                player.SetRole(player_spawns[player.PlayerId].role, RoleChangeReason.Respawn);
+                player.SetRole(player_spawns[player.ReferenceHub.PlayerId].role, RoleChangeReason.Respawn);
             }
         }
 
@@ -390,17 +414,17 @@ namespace TheRiptide
             {
                 if (player == null)
                 {
-                    Log.Error("could not teleport player because player was null");
+                    Logger.Error("could not teleport player because player was null");
                     return;
                 }
 
-                if (!player_spawns.ContainsKey(player.PlayerId))
+                if (!player_spawns.ContainsKey(player.ReferenceHub.PlayerId))
                 {
-                    Log.Error("could not teleport player: " + player.Nickname + " because they where never added to players");
+                    Logger.Error("could not teleport player: " + player.Nickname + " because they where never added to players");
                     return;
                 }
 
-                Spawn spawn = player_spawns[player.PlayerId];
+                Spawn spawn = player_spawns[player.ReferenceHub.PlayerId];
 
                 if (spawn.in_spawn)
                 {
@@ -411,7 +435,7 @@ namespace TheRiptide
                         occupied_positions.Add(false);
 
                     HashSet<RoomIdentifier> occupied_rooms = new HashSet<RoomIdentifier>();
-                    foreach (Player p in Player.GetPlayers())
+                    foreach (Player p in Player.List)
                     {
                         if (Rooms.ValidPlayerInRoom(p))
                         {
@@ -477,28 +501,28 @@ namespace TheRiptide
                             ApplyGameNotStartedEffects(player);
                         spawn.in_spawn = false;
                         Tracking.Singleton.PlayerSpawn(player);
-                        player.EffectsManager.ChangeState<CustomPlayerEffects.SpawnProtected>(1, config.SpawnProtection);
+                        player.ReferenceHub.playerEffectsController.ChangeState<CustomPlayerEffects.SpawnProtected>(1, config.SpawnProtection);
                     }
                     else
                     {
-                        Log.Error("could not teleport player: " + player.Nickname + " because there was no opened rooms");
+                        Logger.Error("could not teleport player: " + player.Nickname + " because there was no opened rooms");
                     }
                 }
                 else
                 {
-                    Log.Error("could not teleport player: " + player.Nickname + " because they are not in spawn");
+                    Logger.Error("could not teleport player: " + player.Nickname + " because they are not in spawn");
                 }
             }
             catch (Exception ex)
             {
-                Log.Error("teleport error: " + ex.ToString());
+                Logger.Error("teleport error: " + ex.ToString());
             }
         }
 
         public static void ApplyGameNotStartedEffects(Player player)
         {
-            player.EffectsManager.ChangeState<CustomPlayerEffects.MovementBoost>(255, 0);
-            player.EffectsManager.ChangeState<CustomPlayerEffects.DamageReduction>(255, 0);
+            player.ReferenceHub.playerEffectsController.ChangeState<CustomPlayerEffects.MovementBoost>(255, 0);
+            player.ReferenceHub.playerEffectsController.ChangeState<CustomPlayerEffects.DamageReduction>(255, 0);
         }
     }
 }

@@ -3,10 +3,11 @@ using InventorySystem.Items.Firearms;
 using InventorySystem.Items.Firearms.Attachments;
 using InventorySystem.Items.Armor;
 using PlayerStatsSystem;
-using PluginAPI.Core;
-using PluginAPI.Core.Attributes;
+using LabApi.Features.Wrappers;
+using LabApi.Features.Console;
+
 using PluginAPI.Core.Items;
-using PluginAPI.Enums;
+
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
@@ -500,25 +501,22 @@ namespace TheRiptide
                 throw new System.Exception("Killstreak Config Error: KillstreakTables must contain the DefaultKillstreak");
         }
 
-        [PluginEvent(ServerEventType.PlayerJoined)]
         void OnPlayerJoined(Player player)
         {
-            if (!player_killstreak.ContainsKey(player.PlayerId))
-                player_killstreak.Add(player.PlayerId, new Killstreak { name = config.DefaultKillstreak });
+            if (!player_killstreak.ContainsKey(player.ReferenceHub.PlayerId))
+                player_killstreak.Add(player.ReferenceHub.PlayerId, new Killstreak { name = config.DefaultKillstreak });
         }
 
-        [PluginEvent(ServerEventType.PlayerLeft)]
         void OnPlayerLeft(Player player)
         {
-            if (player_killstreak.ContainsKey(player.PlayerId))
+            if (player_killstreak.ContainsKey(player.ReferenceHub.PlayerId))
             {
-                if (!player.DoNotTrack)
+                if (!player.ReferenceHub.authManager.DoNotTrack)
                     Database.Singleton.SaveConfigKillstreak(player);
-                player_killstreak.Remove(player.PlayerId);
+                player_killstreak.Remove(player.ReferenceHub.PlayerId);
             }
         }
 
-        [PluginEvent(ServerEventType.PlayerDeath)]
         void OnPlayerDeath(Player victim, Player killer, DamageHandlerBase damage)
         {
             if (killer != null && player_killstreak.ContainsKey(killer.PlayerId))
@@ -597,18 +595,18 @@ namespace TheRiptide
 
         public static Killstreak GetKillstreak(Player player)
         {
-            return player_killstreak[player.PlayerId];
+            return player_killstreak[player.ReferenceHub.PlayerId];
         }
 
         public string KillstreakColorCode(Player player)
         {
-            Killstreak killstreak = player_killstreak[player.PlayerId];
+            Killstreak killstreak = player_killstreak[player.ReferenceHub.PlayerId];
             return config.KillstreakTables[killstreak.name].ColorHex;
         }
 
         public void KillstreakLoaded(Player player)
         {
-            Killstreak killstreak = player_killstreak[player.PlayerId];
+            Killstreak killstreak = player_killstreak[player.ReferenceHub.PlayerId];
             if (!config.KillstreakTables.ContainsKey(killstreak.name))
                 killstreak.name = config.DefaultKillstreak;
 
@@ -618,13 +616,13 @@ namespace TheRiptide
 
         public bool IsLoadoutLocked(Player player)
         {
-            Killstreak killstreak = player_killstreak[player.PlayerId];
+            Killstreak killstreak = player_killstreak[player.ReferenceHub.PlayerId];
             return config.KillstreakTables[killstreak.name].LoadoutLock;
         }
 
         public void AddKillstreakStartAmmo(Player player)
         {
-            Killstreak killstreak = player_killstreak[player.PlayerId];
+            Killstreak killstreak = player_killstreak[player.ReferenceHub.PlayerId];
             KillstreakRewardTable table = config.KillstreakTables[killstreak.name];
             ItemType armor = ArmorType(player);
             Loadouts.Loadout loadout = Loadouts.GetLoadout(player);
@@ -646,7 +644,7 @@ namespace TheRiptide
 
         public void AddKillstreakStartItems(Player player)
         {
-            Killstreak killstreak = player_killstreak[player.PlayerId];
+            Killstreak killstreak = player_killstreak[player.ReferenceHub.PlayerId];
             KillstreakRewardTable table = config.KillstreakTables[killstreak.name];
 
             if (!table.ItemTable.IsEmpty() && table.ItemTable.ContainsKey(0))
@@ -657,8 +655,8 @@ namespace TheRiptide
 
         public void AddKillstreakStartEffects(Player player)
         {
-            Killstreak killstreak = player_killstreak[player.PlayerId];
-            player.EffectsManager.DisableAllEffects();
+            Killstreak killstreak = player_killstreak[player.ReferenceHub.PlayerId];
+            player.ReferenceHub.playerEffectsController.DisableAllEffects();
             KillstreakRewardTable table = config.KillstreakTables[killstreak.name];
 
             if (!table.PlayerTable.IsEmpty() && table.PlayerTable.ContainsKey(0))
@@ -673,7 +671,7 @@ namespace TheRiptide
 
         public ItemType ArmorType(Player player)
         {
-            Killstreak killstreak = player_killstreak[player.PlayerId];
+            Killstreak killstreak = player_killstreak[player.ReferenceHub.PlayerId];
             KillstreakRewardTable table = config.KillstreakTables[killstreak.name];
             if(table.ItemTable.ContainsKey(0))
             {
@@ -798,7 +796,7 @@ namespace TheRiptide
 
         private void GrantEffectReward(Player player, EffectReward reward)
         {
-            player.EffectsManager.ChangeState(reward.Effect, reward.Intensity, reward.Duration);
+            player.ReferenceHub.playerEffectsController.ChangeState(reward.Effect, reward.Intensity, reward.Duration);
         }
 
         private void GrantItemReward(Player player, ItemReward reward)

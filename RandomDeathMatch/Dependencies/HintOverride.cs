@@ -1,7 +1,6 @@
 ﻿using MEC;
-using PluginAPI.Core;
-using PluginAPI.Core.Attributes;
-using PluginAPI.Enums;
+using LabApi.Features.Wrappers;
+using LabApi.Features.Console;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -111,47 +110,45 @@ namespace TheRiptide
 
         private static Dictionary<int, HintInfo> hint_info = new Dictionary<int, HintInfo>();
 
-        [PluginEvent(ServerEventType.PlayerJoined)]
         void OnPlayerJoined(Player player)
         {
-            if (!hint_info.ContainsKey(player.PlayerId))
-                hint_info.Add(player.PlayerId, new HintInfo());
+            if (!hint_info.ContainsKey(player.ReferenceHub.PlayerId))
+                hint_info.Add(player.ReferenceHub.PlayerId, new HintInfo());
         }
 
-        [PluginEvent(ServerEventType.PlayerLeft)]
         void OnPlayerLeft(Player player)
         {
-            if (hint_info.ContainsKey(player.PlayerId))
-                hint_info.Remove(player.PlayerId);
+            if (hint_info.ContainsKey(player.ReferenceHub.PlayerId))
+                hint_info.Remove(player.ReferenceHub.PlayerId);
         }
 
         public static void Add(Player player, int id, string msg, float duration)
         {
-            if (hint_info.ContainsKey(player.PlayerId))
-                hint_info[player.PlayerId].Add(id, msg, duration);
+            if (hint_info.ContainsKey(player.ReferenceHub.PlayerId))
+                hint_info[player.ReferenceHub.PlayerId].Add(id, msg, duration);
         }
 
         public static void Remove(Player player, int id)
         {
-            if (hint_info.ContainsKey(player.PlayerId))
-                hint_info[player.PlayerId].Remove(id);
+            if (hint_info.ContainsKey(player.ReferenceHub.PlayerId))
+                hint_info[player.ReferenceHub.PlayerId].Remove(id);
         }
 
         public static void Clear(Player player)
         {
-            if (hint_info.ContainsKey(player.PlayerId))
-                hint_info[player.PlayerId].Clear();
+            if (hint_info.ContainsKey(player.ReferenceHub.PlayerId))
+                hint_info[player.ReferenceHub.PlayerId].Clear();
         }
 
         public static void Refresh(Player player)
         {
-            if (hint_info.ContainsKey(player.PlayerId))
-                hint_info[player.PlayerId].Refresh(player);
+            if (hint_info.ContainsKey(player.ReferenceHub.PlayerId))
+                hint_info[player.ReferenceHub.PlayerId].Refresh(player);
         }
 
         public static void Refresh()
         {
-            foreach (var p in Player.GetPlayers())
+            foreach (var p in Player.List)
                 if (p.IsReady && hint_info.ContainsKey(p.PlayerId))
                     hint_info[p.PlayerId].Refresh(p);
         }

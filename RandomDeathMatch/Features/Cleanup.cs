@@ -6,9 +6,8 @@ using InventorySystem.Items.Pickups;
 using MEC;
 using Mirror;
 using PlayerRoles.Ragdolls;
-using PluginAPI.Core;
-using PluginAPI.Core.Attributes;
-using PluginAPI.Enums;
+using LabApi.Features.Wrappers;
+using LabApi.Features.Console;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -56,7 +55,6 @@ namespace TheRiptide
             this.config = config;
         }
 
-        [PluginEvent(ServerEventType.RoundStart)]
         void OnRoundStart()
         {
             Timing.CallDelayed(1.0f, () =>
@@ -107,7 +105,7 @@ namespace TheRiptide
                 }
                 catch(Exception ex)
                 {
-                    Log.Error("_ItemCleaup Error: " + ex.ToString());
+                    Logger.Error("_ItemCleaup Error: " + ex.ToString());
                 }
 
                 yield return Timing.WaitForSeconds(config.ItemCleanupPeriod);
@@ -126,7 +124,7 @@ namespace TheRiptide
                 }
                 catch (Exception ex)
                 {
-                    Log.Error("_RagdollCleaup Error: " + ex.ToString());
+                    Logger.Error("_RagdollCleaup Error: " + ex.ToString());
                 }
 
                 yield return Timing.WaitForSeconds(config.RagdollCleanupPeriod);

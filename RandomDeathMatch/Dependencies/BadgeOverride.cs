@@ -1,6 +1,5 @@
-﻿using PluginAPI.Core;
-using PluginAPI.Core.Attributes;
-using PluginAPI.Enums;
+﻿using LabApi.Features.Wrappers;
+using LabApi.Features.Console;
 using System.Collections.Generic;
 
 namespace TheRiptide
@@ -68,10 +67,9 @@ namespace TheRiptide
             this.slots = slots;
         }
 
-        [PluginEvent(ServerEventType.PlayerJoined)]
         void OnPlayerJoined(Player player)
         {
-            int id = player.PlayerId;
+            int id = player.ReferenceHub.PlayerId;
             Badge badge = new Badge();
             for (int i = 0; i < slots; i++)
                 badge.badges.Add("");
@@ -79,19 +77,16 @@ namespace TheRiptide
                 player_badges.Add(id, badge);
         }
 
-        [PluginEvent(ServerEventType.PlayerLeft)]
         void OnPlayerLeft(Player player)
         {
-            int id = player.PlayerId;
+            int id = player.ReferenceHub.PlayerId;
             if (player_badges.ContainsKey(id))
                 player_badges.Remove(id);
         }
-
-
         public void SetBadge(Player player, int slot, string badge)
         {
-            player_badges[player.PlayerId].badges[slot] = badge;
-            player.ReferenceHub.serverRoles.Network_myText = player_badges[player.PlayerId].BadgeText();
+            player_badges[player.ReferenceHub.PlayerId].badges[slot] = badge;
+            player.ReferenceHub.serverRoles.Network_myText = player_badges[player.ReferenceHub.PlayerId].BadgeText();
         }
 
         public void SetBadgeColor(Player player, string color)

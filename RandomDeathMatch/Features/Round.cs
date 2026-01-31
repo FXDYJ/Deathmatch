@@ -106,7 +106,7 @@ namespace TheRiptide
             {
                 try
                 {
-                    restart_handle = Timing.CallDelayed(config.RoundEndTime, () => LabApi.Features.Wrappers.Round.Restart(false));
+                    restart_handle = Timing.CallDelayed(config.RoundEndTime, () => LabApi.Features.Wrappers.LabApi.Features.Wrappers.Round.Restart(false));
                     Timing.CallPeriodically(config.RoundEndTime, 0.2f, () =>
                     {
                         foreach (var p in Player.List)
@@ -145,8 +145,8 @@ namespace TheRiptide
             Server.Host.SetRole(RoleTypeId.Scp939);
             Server.Host.ReferenceHub.nicknameSync.SetNick(config.DummyPlayerName);
             Server.Host.Position = new Vector3(128.8f, 994.0f, 18.0f);
-            LabApi.Features.Wrappers.Round.IsLocked = true;
-            LabApi.Features.Wrappers.Warhead.IsLocked = true;
+            LabApi.Features.Wrappers.LabApi.Features.Wrappers.Round.IsLocked = true;
+            LabApi.Features.Wrappers.LabApi.Features.Wrappers.Warhead.IsLocked = true;
             DecontaminationController.Singleton.NetworkDecontaminationOverride = DecontaminationController.DecontaminationStatus.Disabled;
             AttackerDamageHandler._ffMultiplier = 1.0f;
         }
@@ -157,7 +157,7 @@ namespace TheRiptide
         public void RoundRestart()
         {
             Timing.KillCoroutines(round_timer_handle, restart_handle, round_5_minute_warning, round_1_minute_warning);
-            LabApi.Features.Wrappers.Round.IsLocked = false;
+            LabApi.Features.Wrappers.LabApi.Features.Wrappers.Round.IsLocked = false;
         }
 
         /// <summary>
@@ -166,7 +166,7 @@ namespace TheRiptide
         public void RoundEnd()
         {
             Timing.KillCoroutines(round_timer_handle, restart_handle, round_5_minute_warning, round_1_minute_warning);
-            LabApi.Features.Wrappers.Round.IsLocked = false;
+            LabApi.Features.Wrappers.LabApi.Features.Wrappers.Round.IsLocked = false;
         }
     }
 }

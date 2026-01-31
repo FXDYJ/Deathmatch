@@ -1,5 +1,6 @@
 ﻿using PlayerRoles;
-using PluginAPI.Core;
+using LabApi.Features.Wrappers;
+using LabApi.Features.Console;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -378,7 +379,7 @@ namespace TheRiptide
                 }),
                 new MenuItem(ItemType.KeycardJanitor, translation.AreYouSure, (player)=>
                 {
-                    if(player.DoNotTrack)
+                    if(player.ReferenceHub.authManager.DoNotTrack)
                     {
                         Database.Singleton.DeleteData(player);
                         InventoryMenu.ShowMenu(player, (int)MenuPage.Preference);

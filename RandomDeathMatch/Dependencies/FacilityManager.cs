@@ -2,9 +2,8 @@
 using Interactables.Interobjects.DoorUtils;
 using MapGeneration;
 using MEC;
-using PluginAPI.Core;
-using PluginAPI.Core.Attributes;
-using PluginAPI.Enums;
+using LabApi.Features.Wrappers;
+using LabApi.Features.Console;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -70,7 +69,7 @@ namespace TheRiptide
                 }
                 catch(Exception ex)
                 {
-                    Log.Error(ex.ToString());
+                    Logger.Error(ex.ToString());
                 }
             });
         }

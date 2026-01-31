@@ -1,7 +1,6 @@
 ﻿using PlayerRoles;
-using PluginAPI.Core;
-using PluginAPI.Core.Attributes;
-using PluginAPI.Enums;
+using LabApi.Features.Wrappers;
+using LabApi.Features.Console;
 using PlayerRoles.FirstPersonControl;
 using System.Collections.Generic;
 using HarmonyLib;
@@ -49,20 +48,18 @@ namespace TheRiptide
             force_mode = false;
         }
 
-        [PluginEvent(ServerEventType.PlayerJoined)]
         void OnPlayerJoined(Player player)
         {
-            if (!player_mode.ContainsKey(player.PlayerId))
-                player_mode.Add(player.PlayerId, TalkMode.GlobalTalkGlobalReceive);
+            if (!player_mode.ContainsKey(player.ReferenceHub.PlayerId))
+                player_mode.Add(player.ReferenceHub.PlayerId, TalkMode.GlobalTalkGlobalReceive);
             else
-                player_mode[player.PlayerId] = TalkMode.GlobalTalkGlobalReceive;
+                player_mode[player.ReferenceHub.PlayerId] = TalkMode.GlobalTalkGlobalReceive;
         }
 
-        [PluginEvent(ServerEventType.PlayerLeft)]
         void onPlayerLeft(Player player)
         {
-            if (player_mode.ContainsKey(player.PlayerId))
-                player_mode.Remove(player.PlayerId);
+            if (player_mode.ContainsKey(player.ReferenceHub.PlayerId))
+                player_mode.Remove(player.ReferenceHub.PlayerId);
         }
 
         public void ForceGlobalTalkGlobalReceive()
@@ -131,7 +128,7 @@ namespace TheRiptide
 
                 if (!Singleton.force_mode)
                 {
-                    int id = player.PlayerId;
+                    int id = player.ReferenceHub.PlayerId;
                     if (Singleton.player_mode.ContainsKey(id))
                     {
                         switch (Singleton.player_mode[id])
@@ -155,7 +152,7 @@ namespace TheRiptide
             }
             catch(System.Exception ex)
             {
-                Log.Error("noclip error: " + ex.ToString());
+                Logger.Error("noclip error: " + ex.ToString());
             }
             return false;
         }

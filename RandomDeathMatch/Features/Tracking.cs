@@ -1,9 +1,8 @@
 ﻿using InventorySystem.Items.Firearms.Attachments;
 using InventorySystem.Items.Firearms;
 using PlayerStatsSystem;
-using PluginAPI.Core;
-using PluginAPI.Core.Attributes;
-using PluginAPI.Enums;
+using LabApi.Features.Wrappers;
+using LabApi.Features.Console;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -61,7 +60,7 @@ namespace TheRiptide
                     }
                     catch (Exception ex)
                     {
-                        Log.Error("on damage error: " + ex.ToString());
+                        Logger.Error("on damage error: " + ex.ToString());
                     }
                 });
                 PlayerStats.OnAnyPlayerDamaged += OnPlayerDamaged;
@@ -73,7 +72,6 @@ namespace TheRiptide
             current_round = null;
         }
 
-        [PluginEvent(ServerEventType.RoundStart)]
         void OnRoundStart()
         {
             if (config.TrackRounds)
@@ -84,33 +82,31 @@ namespace TheRiptide
             }
         }
 
-        [PluginEvent(ServerEventType.PlayerJoined)]
         void OnPlayerJoined(Player player)
         {
-            int id = player.PlayerId;
+            int id = player.ReferenceHub.PlayerId;
             if (!player_sessions.ContainsKey(id))
                 player_sessions.Add(id, new Database.Session());
             else
-                player_sessions[player.PlayerId] = new Database.Session();
+                player_sessions[player.ReferenceHub.PlayerId] = new Database.Session();
 
-            Database.Session session = player_sessions[player.PlayerId];
+            Database.Session session = player_sessions[player.ReferenceHub.PlayerId];
             session.nickname = player.Nickname;
             session.round = current_round;
 
             if (current_round != null)
-                if (Player.Count > current_round.max_players)
-                    current_round.max_players = Player.Count;
+                if (Player.List.Count() > current_round.max_players)
+                    current_round.max_players = Player.List.Count();
         }
 
-        [PluginEvent(ServerEventType.PlayerLeft)]
         void OnPlayerLeft(Player player)
         {
-            int id = player.PlayerId;
+            int id = player.ReferenceHub.PlayerId;
             if (player_sessions.ContainsKey(id))
             {
-                player_sessions[player.PlayerId].disconnect = System.DateTime.Now;
+                player_sessions[player.ReferenceHub.PlayerId].disconnect = System.DateTime.Now;
                 Database.Singleton.SaveTrackingSession(player);
-                if (!DmRound.game_ended && !player.DoNotTrack)
+                if (!DmRound.game_ended && !player.ReferenceHub.authManager.DoNotTrack)
                     Database.Singleton.UpdateLeaderBoard(player);
                 player_sessions.Remove(id);
             }
@@ -119,7 +115,6 @@ namespace TheRiptide
                 player_life.Remove(id);
         }
 
-        [PluginEvent(ServerEventType.PlayerDeath)]
         void OnPlayerDeath(Player victim, Player killer, DamageHandlerBase damage)
         {
             if(victim != null && killer != null && player_life.ContainsKey(victim.PlayerId) && player_life.ContainsKey(killer.PlayerId))
@@ -137,7 +132,6 @@ namespace TheRiptide
             }
         }
 
-        [PluginEvent(ServerEventType.PlayerDamage)]
         void OnPlayerDamage(Player attacker, Player victim, DamageHandlerBase damage)
         {
             if (config.TrackHits && victim != null && attacker != null && player_life.ContainsKey(victim.PlayerId) && player_life.ContainsKey(attacker.PlayerId))
@@ -156,14 +150,13 @@ namespace TheRiptide
             }
         }
 
-        [PluginEvent(ServerEventType.PlayerShotWeapon)]
         void OnPlayerShotWeapon(Player player, Firearm firearm)
         {
             if(player != null)
             {
-                if (player_life.ContainsKey(player.PlayerId))
+                if (player_life.ContainsKey(player.ReferenceHub.PlayerId))
                 {
-                    Database.Life life = player_life[player.PlayerId];
+                    Database.Life life = player_life[player.ReferenceHub.PlayerId];
                     if (life != null)
                         life.shots++;
                 }
@@ -182,26 +175,26 @@ namespace TheRiptide
                 }
                 catch(Exception ex)
                 {
-                    Log.Error(ex.ToString());
+                    Logger.Error(ex.ToString());
                 }
             }
         }
 
         public void PlayerSpawn(Player player)
         {
-            if(player != null && player_sessions.ContainsKey(player.PlayerId))
+            if(player != null && player_sessions.ContainsKey(player.ReferenceHub.PlayerId))
             {
-                Database.Session session = player_sessions[player.PlayerId];
+                Database.Session session = player_sessions[player.ReferenceHub.PlayerId];
                 Database.Life life = new Database.Life();
                 Database.Loadout loadout = null;
                 session.lives.Add(life);
-                if (player_life.ContainsKey(player.PlayerId))
+                if (player_life.ContainsKey(player.ReferenceHub.PlayerId))
                 {
-                    loadout = player_life[player.PlayerId].loadout;
-                    player_life[player.PlayerId] = life;
+                    loadout = player_life[player.ReferenceHub.PlayerId].loadout;
+                    player_life[player.ReferenceHub.PlayerId] = life;
                 }
                 else
-                    player_life.Add(player.PlayerId, life);
+                    player_life.Add(player.ReferenceHub.PlayerId, life);
                 life.role = Lobby.Singleton.GetSpawn(player).role;
                 if (config.TrackLoadouts)
                 {
@@ -233,10 +226,8 @@ namespace TheRiptide
 
         public Database.Session GetSession(Player player)
         {
-            return player_sessions[player.PlayerId];
+            return player_sessions[player.ReferenceHub.PlayerId];
         }
-
-
         [CommandHandler(typeof(RemoteAdminCommandHandler))]
         public class DmDeleteUser : ICommand
         {

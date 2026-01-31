@@ -4,9 +4,8 @@ using System.Diagnostics;
 using System.Linq;
 using MEC;
 using PlayerStatsSystem;
-using PluginAPI.Core;
-using PluginAPI.Core.Attributes;
-using PluginAPI.Enums;
+using LabApi.Features.Wrappers;
+using LabApi.Features.Console;
 using static TheRiptide.Translation;
 
 namespace TheRiptide
@@ -132,19 +131,17 @@ namespace TheRiptide
                 broadcast_layout.Add(killfeed_line_size);
         }
 
-        [PluginEvent(ServerEventType.PlayerJoined)]
         void OnPlayerJoined(Player player)
         {
-            if (!player_killfeed.ContainsKey(player.PlayerId))
-                player_killfeed.Add(player.PlayerId, new Killfeed());
+            if (!player_killfeed.ContainsKey(player.ReferenceHub.PlayerId))
+                player_killfeed.Add(player.ReferenceHub.PlayerId, new Killfeed());
             SetBroadcastKillfeedLayout(player);
         }
 
-        [PluginEvent(ServerEventType.PlayerLeft)]
         void OnPlayerLeft(Player player)
         {
-            if (player_killfeed.ContainsKey(player.PlayerId))
-                player_killfeed.Remove(player.PlayerId);
+            if (player_killfeed.ContainsKey(player.ReferenceHub.PlayerId))
+                player_killfeed.Remove(player.ReferenceHub.PlayerId);
         }
 
         public static void SetBroadcastKillfeedLayout(Player player)
@@ -255,11 +252,11 @@ namespace TheRiptide
                     kill_msg = translation.SelfKill.Replace("{victim}", victim_name);
             }
 
-            foreach (Player player in Player.GetPlayers())
+            foreach (Player player in Player.List)
             {
-                if (player_killfeed.ContainsKey(player.PlayerId))
+                if (player_killfeed.ContainsKey(player.ReferenceHub.PlayerId))
                 {
-                    int id = player.PlayerId;
+                    int id = player.ReferenceHub.PlayerId;
                     Killfeed killfeed = player_killfeed[id];
                     if (id == victim.PlayerId || (killer != null && id == killer.PlayerId))
                         killfeed.PushKill(true, kill_msg, special_duration);
@@ -271,13 +268,13 @@ namespace TheRiptide
 
         public static void UpdateIfDirty(Player player)
         {
-            if (player_killfeed.ContainsKey(player.PlayerId))
-                player_killfeed[player.PlayerId].UpdateIfDirty(player);
+            if (player_killfeed.ContainsKey(player.ReferenceHub.PlayerId))
+                player_killfeed[player.ReferenceHub.PlayerId].UpdateIfDirty(player);
         }
 
         public static void UpdateAllDirty()
         {
-            foreach (Player player in Player.GetPlayers())
+            foreach (Player player in Player.List)
                 UpdateIfDirty(player);
         }
     }

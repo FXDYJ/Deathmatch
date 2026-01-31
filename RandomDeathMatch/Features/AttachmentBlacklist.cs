@@ -1,9 +1,8 @@
 ﻿using InventorySystem.Items;
 using InventorySystem.Items.Firearms;
 using InventorySystem.Items.Firearms.Attachments;
-using PluginAPI.Core;
-using PluginAPI.Core.Attributes;
-using PluginAPI.Enums;
+using LabApi.Features.Wrappers;
+using LabApi.Features.Console;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -39,7 +38,6 @@ namespace TheRiptide
             this.config = config;
         }
 
-        [PluginEvent(ServerEventType.RoundStart)]
         void OnRoundStart()
         {
             //foreach(RoomIdentifier room in RoomIdentifier.AllRoomIdentifiers)
@@ -50,7 +48,6 @@ namespace TheRiptide
             //}
         }
 
-        [PluginEvent(ServerEventType.PlayerChangeItem)]
         void OnPlayerChangeItem(Player player, ushort old_item, ushort new_item)
         {
             if(player.ReferenceHub.inventory.UserInventory.Items.ContainsKey(new_item))
@@ -61,7 +58,6 @@ namespace TheRiptide
             }
         }
 
-        [PluginEvent(ServerEventType.PlayerShotWeapon)]
         void OnShotWeapon(Player player, Firearm firearm)
         {
             RemoveBanned(player, firearm);

@@ -2,9 +2,8 @@
 using InventorySystem.Items;
 using MEC;
 using PlayerStatsSystem;
-using PluginAPI.Core;
-using PluginAPI.Core.Attributes;
-using PluginAPI.Enums;
+using LabApi.Features.Wrappers;
+using LabApi.Features.Console;
 using RemoteAdmin;
 using System;
 using System.Collections.Generic;
@@ -18,12 +17,26 @@ using static TheRiptide.Translation;
 
 namespace TheRiptide
 {
+    /// <summary>
+    /// 经验系统配置类
+    /// </summary>
     public class ExperienceConfig
     {
+        /// <summary>
+        /// 是否启用经验系统
+        /// </summary>
         public bool IsEnabled { get; set; } = true;
-        [Description("log how much xp and the reason to the recievers gameconsole")]
+        
+        /// <summary>
+        /// 是否在游戏控制台记录经验获取
+        /// </summary>
+        [Description("是否在接收者的游戏控制台记录经验获取数量和原因")]
         public bool GameConsoleLog { get; set; } = true;
-        [Description("xp rewards. xp is only saved at the end of the round, if a player leaves before the round ends they will not receive any xp")]
+        
+        /// <summary>
+        /// 经验奖励配置，经验仅在回合结束时保存，提前离开的玩家不会获得经验
+        /// </summary>
+        [Description("经验奖励配置，经验仅在回合结束时保存，提前离开的玩家不会获得经验")]
         public int XpPerKill { get; set; } = 50;
         public int XpPerMinute { get; set; } = 20;
         public int XpOn100Damage { get; set; } = 25;
@@ -35,10 +48,17 @@ namespace TheRiptide
         public int XpOn15Killstreak { get; set; } = 2000;
         public int XpOn20Killstreak { get; set; } = 4000;
         public int XpOn25Killstreak { get; set; } = 10000;
-        [Description("xp granted 30 seconds into the round to reward players that stay an entire round")]
+        
+        /// <summary>
+        /// 回合开始30秒后奖励的经验，用于奖励完整参与回合的玩家
+        /// </summary>
+        [Description("回合开始30秒后奖励的经验，用于奖励完整参与回合的玩家")]
         public int XpOnRoundStart { get; set; } = 1200;
 
-        [Description("see the global reference config for all item types")]
+        /// <summary>
+        /// 使用物品获得的经验
+        /// </summary>
+        [Description("使用物品获得的经验，请参阅全局参考配置获取所有物品类型")]
         public Dictionary<ItemType, int> XpOnItemUse { get; set; } = new Dictionary<ItemType, int>
         {
             {ItemType.Painkillers,5 },
@@ -57,7 +77,10 @@ namespace TheRiptide
 
         };
 
-        [Description("see the global reference config for all item types")]
+        /// <summary>
+        /// 投掷物品获得的经验
+        /// </summary>
+        [Description("投掷物品获得的经验，请参阅全局参考配置获取所有物品类型")]
         public Dictionary<ItemType, int> XpOnItemThrown { get; set; } = new Dictionary<ItemType, int>
         {
             {ItemType.SCP244a, 50 },
@@ -66,17 +89,24 @@ namespace TheRiptide
             {ItemType.SCP018, 300 },
         };
 
-        [Description("xp leveling - to fine tune these values use this calculator https://www.desmos.com/calculator/1dqftattpd")]
+        /// <summary>
+        /// 经验等级计算参数，可使用此计算器调整: https://www.desmos.com/calculator/1dqftattpd
+        /// </summary>
+        [Description("经验等级计算参数，可使用此计算器调整: https://www.desmos.com/calculator/1dqftattpd")]
         public int BaseXpLevel { get; set; } = 250;
         public float LevelExponent { get; set; } = 1.1f;
         public float StageExponent { get; set; } = 1.25f;
         public float TierExponent { get; set; } = 1.5f;
 
         public int XpRounding { get; set; } = 5;
-        [Description("value = xp to next level")]
+        
+        /// <summary>
+        /// 徽章格式，value = 到下一级所需经验
+        /// </summary>
+        [Description("徽章格式，value = 到下一级所需经验")]
         public string BadgeFormat { get; set; } = "{tier} | {stage} | {level} | {value}";
         public string LeaderBoardFormat { get; set; } = "{tier} {stage} {level}";
-        public string XpToNextLevelFormat { get; set; } = "XP: {xp}/{max}";
+        public string XpToNextLevelFormat { get; set; } = "经验: {xp}/{max}";
         public List<string> LevelTags { get; set; } = new List<string>
         {
             "Level: 1",
@@ -215,25 +245,23 @@ namespace TheRiptide
             this.config = config;
         }
 
-        [PluginEvent(ServerEventType.RoundStart)]
         void OnRoundStart()
         {
             Timing.CallDelayed(30.0f, ()=>
             {
-                foreach (var player in Player.GetPlayers())
-                    if (player != null && player_xp.ContainsKey(player.PlayerId))
+                foreach (var player in Player.List)
+                    if (player != null && player_xp.ContainsKey(player.ReferenceHub.PlayerId))
                         RewardXp(player, config.XpOnRoundStart, translation.RewardXpRoundStart);
             });
         }
 
-        [PluginEvent(ServerEventType.PlayerJoined)]
         void OnPlayerJoined(Player player)
         {
-            int id = player.PlayerId;
+            int id = player.ReferenceHub.PlayerId;
             if (!player_xp.ContainsKey(id))
             {
                 player_xp.Add(id, new XP());
-                if (!player.DoNotTrack)
+                if (!player.ReferenceHub.authManager.DoNotTrack)
                     Database.Singleton.LoadExperience(player);
                 else
                     BadgeOverride.Singleton.SetBadge(player, 1, BadgeString(player_xp[id]));
@@ -243,10 +271,9 @@ namespace TheRiptide
                 player_tracking.Add(id, new Tracking());
         }
 
-        [PluginEvent(ServerEventType.PlayerLeft)]
         void OnPlayerLeft(Player player)
         {
-            int id = player.PlayerId;
+            int id = player.ReferenceHub.PlayerId;
             if (player_xp.ContainsKey(id))
                 player_xp.Remove(id);
 
@@ -257,21 +284,18 @@ namespace TheRiptide
                 previous_xp.Remove(id);
         }
 
-        [PluginEvent(ServerEventType.PlayerUsedItem)]
         void OnPlayerUsedItem(Player player, ItemBase item)
         {
             if (player != null && config.XpOnItemUse.ContainsKey(item.ItemTypeId))
                 RewardXp(player, config.XpOnItemUse[item.ItemTypeId], translation.RewardXpItemUsed.Replace("{item}", item.ItemTypeId.ToString()));
         }
 
-        [PluginEvent(ServerEventType.PlayerThrowItem)]
         void OnThrowItem(Player player, ItemBase item, Rigidbody rb)
         {
             if (player != null && config.XpOnItemThrown.ContainsKey(item.ItemTypeId))
                 RewardXp(player, config.XpOnItemThrown[item.ItemTypeId], translation.RewardXpItemThrown.Replace("{item}", item.ItemTypeId.ToString()));
         }
 
-        [PluginEvent(ServerEventType.PlayerDamage)]
         void OnPlayerDamage(Player victim, Player attacker, DamageHandlerBase damage)
         {
             if (victim != null && attacker != null && player_xp.ContainsKey(victim.PlayerId) && player_xp.ContainsKey(attacker.PlayerId))
@@ -293,7 +317,6 @@ namespace TheRiptide
             }
         }
 
-        [PluginEvent(ServerEventType.PlayerDeath)]
         void OnPlayerDeath(Player victim, Player killer, DamageHandlerBase damage)
         {
             if (victim != null && killer != null && player_xp.ContainsKey(victim.PlayerId) && player_xp.ContainsKey(killer.PlayerId) && victim != killer)
@@ -325,8 +348,8 @@ namespace TheRiptide
 
         public void XpLoaded(Player player)
         {
-            XP xp = ApplyLevelUps(player_xp[player.PlayerId]);
-            previous_xp.Add(player.PlayerId, new XP { tier = xp.tier, level = xp.level, stage = xp.stage, value = xp.value });
+            XP xp = ApplyLevelUps(player_xp[player.ReferenceHub.PlayerId]);
+            previous_xp.Add(player.ReferenceHub.PlayerId, new XP { tier = xp.tier, level = xp.level, stage = xp.stage, value = xp.value });
             BadgeOverride.Singleton.SetBadge(player, 1, BadgeString(xp));
             ShowXpHint(player, xp, 10.0f);
             HintOverride.Refresh(player);
@@ -334,19 +357,19 @@ namespace TheRiptide
 
         public void RewardXp(Player player, int amount, string reason)
         {
-            player_xp[player.PlayerId].value += amount;
+            player_xp[player.ReferenceHub.PlayerId].value += amount;
             if (config.GameConsoleLog)
                 player.SendConsoleMessage(reason.Replace("{xp}", amount.ToString()), "cyan");
         }
 
         public XP GetXP(Player player)
         {
-            return player_xp[player.PlayerId];
+            return player_xp[player.ReferenceHub.PlayerId];
         }
 
         public void SaveExperiences()
         {
-            foreach (Player p in Player.GetPlayers())
+            foreach (Player p in Player.List)
             {
                 if (player_xp.ContainsKey(p.PlayerId))
                 {

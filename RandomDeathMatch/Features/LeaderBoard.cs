@@ -6,9 +6,8 @@ using System.Text;
 using System.Threading.Tasks;
 using LiteDB;
 using MEC;
-using PluginAPI.Core;
-using PluginAPI.Core.Attributes;
-using PluginAPI.Enums;
+using LabApi.Features.Wrappers;
+using LabApi.Features.Console;
 using UnityEngine;
 using System.Diagnostics;
 using System.Text.RegularExpressions;
@@ -37,8 +36,6 @@ namespace TheRiptide
 
         [Description("which leader board to display at round end -1 = random, 0 = Rank, 1 = Experience, 2 = Killstreak, 3 = Kills, 4 = Time")]
         public int LeaderBoardType { get; set; } = -1;
-
-
         [Description("table")]
         public string VOffset { get; set; } = "<voffset=7em>";
         public string Format { get; set; } = "<size=29><line-height=75%><mspace=0.55em>";
@@ -135,8 +132,6 @@ namespace TheRiptide
         private bool reloading_leader_board = false;
 
         public bool EnableTitle = true;
-
-
         public LeaderBoard()
         {
             Singleton = this;
@@ -171,11 +166,10 @@ namespace TheRiptide
             handler.SaveConfig(Deathmatch.Singleton, nameof(Deathmatch.Singleton.leader_board_config));
         }
 
-        [PluginEvent(ServerEventType.PlayerLeft)]
         void OnPlayerLeft(Player player)
         {
-            if (player_leader_board_state.ContainsKey(player.PlayerId))
-                player_leader_board_state.Remove(player.PlayerId);
+            if (player_leader_board_state.ContainsKey(player.ReferenceHub.PlayerId))
+                player_leader_board_state.Remove(player.ReferenceHub.PlayerId);
         }
 
         private int MaxPages(LeaderBoardType type)
@@ -185,16 +179,16 @@ namespace TheRiptide
 
         public void EnableLeaderBoardMode(Player player, LeaderBoardType type)
         {
-            if (!player_leader_board_state.ContainsKey(player.PlayerId))
-                player_leader_board_state.Add(player.PlayerId, new State { type = type });
+            if (!player_leader_board_state.ContainsKey(player.ReferenceHub.PlayerId))
+                player_leader_board_state.Add(player.ReferenceHub.PlayerId, new State { type = type });
             HintOverride.Clear(player);
             DisplayLeaderBoard(player, type, 0);
         }
 
         public void DisableLeaderBoardMode(Player player)
         {
-            if (player_leader_board_state.ContainsKey(player.PlayerId))
-                player_leader_board_state.Remove(player.PlayerId);
+            if (player_leader_board_state.ContainsKey(player.ReferenceHub.PlayerId))
+                player_leader_board_state.Remove(player.ReferenceHub.PlayerId);
             HintOverride.Clear(player);
             HintOverride.Refresh(player);
         }
@@ -274,7 +268,7 @@ namespace TheRiptide
                 {
                     try
                     {
-                        foreach (var p in Player.GetPlayers())
+                        foreach (var p in Player.List)
                         {
                             if (p != null && p.UserId != null && user_index.ContainsKey(p.UserId) && player_details[user_index[p.UserId]] == rd)
                             {
@@ -285,7 +279,7 @@ namespace TheRiptide
                     }
                     catch(Exception ex)
                     {
-                        Log.Error("connection highlight error: " + ex.ToString());
+                        Logger.Error("connection highlight error: " + ex.ToString());
                     }
                     string ks_color = config.RecordColor;
                     if (Killstreaks.Singleton.config.KillstreakTables.ContainsKey(rd.killstreak_tag))
@@ -419,7 +413,7 @@ namespace TheRiptide
                         }
                         catch (System.Exception ex)
                         {
-                            Log.Error("update leaderboard error: " + ex.ToString());
+                            Logger.Error("update leaderboard error: " + ex.ToString());
                         }
                     }
                 });
@@ -428,7 +422,7 @@ namespace TheRiptide
 
         public void RebuildLeaderBoard()
         {
-            Log.Info("Rebuilding leader board");
+            Logger.Info("Rebuilding leader board");
             Database.Singleton.Async((db) =>
             {
                 Stopwatch stopwatch = new Stopwatch();
@@ -487,7 +481,7 @@ namespace TheRiptide
                 stopwatch.Stop();
                 Timing.CallDelayed(0.0f,()=>
                 {
-                    Log.Info("Finished rebuilding leader board. Time: " + stopwatch.Elapsed.ToString());
+                    Logger.Info("Finished rebuilding leader board. Time: " + stopwatch.Elapsed.ToString());
                 });
             });
         }
@@ -566,7 +560,7 @@ namespace TheRiptide
                     }
                     catch (Exception ex)
                     {
-                        Log.Error("LeaderBoard _Controller error: " + ex.ToString());
+                        Logger.Error("LeaderBoard _Controller error: " + ex.ToString());
                         player_leader_board_state.Remove(id);
                     }
                 }

@@ -1,13 +1,12 @@
 ﻿using MapGeneration;
-using PluginAPI.Core.Attributes;
-using PluginAPI.Enums;
 using Interactables.Interobjects.DoorUtils;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using MEC;
 using UnityEngine;
-using PluginAPI.Core;
+using LabApi.Features.Wrappers;
+using LabApi.Features.Console;
 using CustomPlayerEffects;
 using PlayerStatsSystem;
 using System.ComponentModel;
@@ -58,7 +57,6 @@ namespace TheRiptide
             this.config = config;
         }
 
-        [PluginEvent(ServerEventType.RoundStart)]
         void OnRoundStart()
         {
             update_handle = Timing.RunCoroutine(_Update());
@@ -66,22 +64,21 @@ namespace TheRiptide
             decontamination_update_handle = Timing.RunCoroutine(_UpdateDecontaminator());
         }
 
-        [PluginEvent(ServerEventType.PlayerJoined)]
         void OnPlayerJoined(Player player)
         {
-            if(Player.Count == 1)
+            if(Player.List.Count() == 1)
             {
                 //UnlockFacility();
                 Timing.CallDelayed(7.0f, () =>
                  {
-                     if (Player.Count == 1)
+                     if (Player.List.Count() == 1)
                      {
                          UnlockFacility();
                          //open_facility = true;
                      }
                  });
             }
-            else if(Player.Count == 2)
+            else if(Player.List.Count() == 2)
             {
                 LockdownFacility();
                 //if (open_facility)
@@ -89,7 +86,7 @@ namespace TheRiptide
                 //    LockdownFacility();
                 //    open_facility = false;
                 //}
-                foreach (Player p in Player.GetPlayers())
+                foreach (Player p in Player.List)
                 {
                     if(p != player)
                     {
@@ -111,32 +108,30 @@ namespace TheRiptide
                         break;
                     }
                 }
-                ResizeFacility((int)Math.Round(Player.Count * config.RoomsPerPlayer));
+                ResizeFacility((int)Math.Round(Player.List.Count() * config.RoomsPerPlayer));
             }
             else
             {
-                ResizeFacility((int)Math.Round(Player.Count * config.RoomsPerPlayer));
+                ResizeFacility((int)Math.Round(Player.List.Count() * config.RoomsPerPlayer));
             }
         }
 
-        [PluginEvent(ServerEventType.PlayerLeft)]
         void OnPlayerLeft(Player player)
         {
-            if (Player.Count == 2)
+            if (Player.List.Count() == 2)
             {
                 UnlockFacility();
             }
-            else if (Player.Count > 2)
+            else if (Player.List.Count() > 2)
             {
-                ResizeFacility((int)Math.Round(Player.Count * config.RoomsPerPlayer));
+                ResizeFacility((int)Math.Round(Player.List.Count() * config.RoomsPerPlayer));
             }
-            ServerConsole.AddLog("player: " + player.Nickname + " left. player count: " + Player.Count);
+            ServerConsole.AddLog("player: " + player.Nickname + " left. player count: " + Player.List.Count());
         }
 
-        [PluginEvent(ServerEventType.PlayerDeath)]
         void OnPlayerDeath(Player target, Player killer, DamageHandlerBase damage)
         {
-            if (Player.Count != 1 && target != null && Deathmatch.IsPlayerValid(target))
+            if (Player.List.Count() != 1 && target != null && Deathmatch.IsPlayerValid(target))
             {
                 ExpandFacility(1);
                 ShrinkFacility(1);
@@ -199,7 +194,7 @@ namespace TheRiptide
         {
             if(opened_rooms.IsEmpty())
             {
-                foreach (var player in Player.GetPlayers())
+                foreach (var player in Player.List)
                     if (SearchForStartRoom(player))
                         break;
                 if (opened_rooms.IsEmpty())
@@ -302,13 +297,13 @@ namespace TheRiptide
             {
                 try
                 {
-                    foreach (Player player in Player.GetPlayers())
+                    foreach (Player player in Player.List)
                     {
                         if (ValidPlayerInRoom(player) && closed_rooms.Keys.Contains(player.Room))
                         {
                             BroadcastOverride.BroadcastLine(player, 1, delta, BroadcastPriority.High, translation.Decontaminating);
                             BroadcastOverride.UpdateIfDirty(player);
-                            player.EffectsManager.EnableEffect<Decontaminating>(1);
+                            player.ReferenceHub.playerEffectsController.EnableEffect<Decontaminating>(1);
                         }
                     }
                 }
@@ -354,7 +349,7 @@ namespace TheRiptide
                 try
                 {
                     //warn players inside rooms marked for closing
-                    foreach (Player player in Player.GetPlayers())
+                    foreach (Player player in Player.List)
                     {
                         if (ValidPlayerInRoom(player) && closing_rooms.ContainsKey(player.Room))
                         {

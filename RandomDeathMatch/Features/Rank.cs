@@ -1,7 +1,6 @@
 ﻿using PlayerStatsSystem;
-using PluginAPI.Core;
-using PluginAPI.Core.Attributes;
-using PluginAPI.Enums;
+using LabApi.Features.Wrappers;
+using LabApi.Features.Console;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -15,57 +14,79 @@ using RemoteAdmin;
 
 namespace TheRiptide
 {
+    /// <summary>
+    /// 排名系统配置类
+    /// </summary>
     public class RankConfig
     {
+        /// <summary>
+        /// 是否启用排名系统
+        /// </summary>
         public bool IsEnabled { get; set; } = true;
 
-        public string BadgeFormat { get; set; } = "Rank: {name}\n";
+        public string BadgeFormat { get; set; } = "段位: {name}\n";
         public string LeaderBoardFormat { get; set; } = "{tag}";
 
-        public string DntName { get; set; } = "Do Not Track";
+        /// <summary>
+        /// 禁止追踪玩家显示名称
+        /// </summary>
+        public string DntName { get; set; } = "禁止追踪";
         public string DntTag { get; set; } = "DNT";
         public string DntColor { get; set; } = "nickel";
 
-        [Description("players start unranked. unranked players cannot influence placement/ranked players. once the MinXpForPlacement is achieved they will progress to placement")]
-        public string UnrankedName { get; set; } = "Unranked";
+        /// <summary>
+        /// 玩家初始为未排名状态，未排名玩家不会影响定级中/已排名玩家，达到最低经验要求后进入定级赛
+        /// </summary>
+        [Description("玩家初始为未排名状态，未排名玩家不会影响定级中/已排名玩家，达到最低经验要求后进入定级赛")]
+        public string UnrankedName { get; set; } = "未排名";
         public string UnrankedTag { get; set; } = "----";
         public string UnrankedColor { get; set; } = "nickel";
-        [Description("minimum rank before players obtain placement rank status. values start at 0 not 1. e.g. level 0 = L:1 level 1 = L2")]
+        
+        /// <summary>
+        /// 进入定级赛所需的最低经验，数值从0开始，例如 level 0 = L:1, level 1 = L:2
+        /// </summary>
+        [Description("进入定级赛所需的最低经验，数值从0开始，例如 level 0 = L:1, level 1 = L:2")]
         public Experiences.XP MinXpForPlacement { get; set; } = new Experiences.XP { value = 0, level = 0, stage = 1, tier = 0 };
 
-        [Description("placement players rank is influenced by other placement players and ranked players but ranked players are not influenced by placement players")]
-        public string PlacementName { get; set; } = "Placement";
+        /// <summary>
+        /// 定级中玩家的排名会受到其他定级中玩家和已排名玩家的影响，但已排名玩家不会受到定级中玩家的影响
+        /// </summary>
+        [Description("定级中玩家的排名会受到其他定级中玩家和已排名玩家的影响，但已排名玩家不会受到定级中玩家的影响")]
+        public string PlacementName { get; set; } = "定级中";
         public string PlacementTag { get; set; } = "?";
         public string PlacementColor { get; set; } = "magenta";
-        [Description("matches referes to kill/deaths against placement and ranked players. this is how many until you become ranked")]
+        
+        /// <summary>
+        /// 定级赛场次指与定级中和已排名玩家的击杀/死亡次数，达到此数量后完成定级
+        /// </summary>
+        [Description("定级赛场次指与定级中和已排名玩家的击杀/死亡次数，达到此数量后完成定级")]
         public int PlacementMatches { get; set; } = 150;
 
-        //[Description("glicko-2 params set when a player start placement")]
-        //public float Rating { get; set; } = 1500;
-        //public float RatingDeviation { get; set; } = 350;
-        //public float RatingVolatility { get; set; } = 0.06f;
-
-        [Description("ranks must be in order of least rating to most rating and colors must be a valid servergroup colors see https://en.scpslgame.com/index.php/Docs:Permissions \n#All players start out with a 1500 rating when they enter placement. Ranks should be scaled around the 1500 mark.")]
+        /// <summary>
+        /// 段位列表，必须按评分从低到高排列，颜色必须是有效的服务器组颜色
+        /// 所有玩家进入定级赛时初始评分为1500，段位应围绕1500进行设置
+        /// </summary>
+        [Description("段位列表必须按评分从低到高排列，颜色必须是有效的服务器组颜色。所有玩家进入定级赛时初始评分为1500")]
         public List<RankInfo> Ranks { get; set; } = new List<RankInfo>
         {
-            new RankInfo{ Name = "Silver I",                        Tag = "S1",     Rating = -150,     Color = "nickel" },
-            new RankInfo{ Name = "Silver II",                       Tag = "S2",     Rating = 0,        Color = "nickel" },
-            new RankInfo{ Name = "Silver III",                      Tag = "S3",     Rating = 150,      Color = "nickel" },
-            new RankInfo{ Name = "Silver IV",                       Tag = "S4",     Rating = 300,      Color = "nickel" },
-            new RankInfo{ Name = "Silver Elite",                    Tag = "SE",     Rating = 550,      Color = "silver" },
-            new RankInfo{ Name = "Silver Elite Master",             Tag = "SEM",    Rating = 700,      Color = "silver" },
-            new RankInfo{ Name = "Gold Nova I",                     Tag = "GN1",    Rating = 950,      Color = "cyan" },
-            new RankInfo{ Name = "Gold Nova II",                    Tag = "GN2",    Rating = 1100,     Color = "cyan" },
-            new RankInfo{ Name = "Gold Nova III",                   Tag = "GN3",    Rating = 1350,     Color = "cyan" },
-            new RankInfo{ Name = "Gold Nova Master",                Tag = "GNM",    Rating = 1500,     Color = "aqua" },
-            new RankInfo{ Name = "Master Guardian I",               Tag = "MG1",    Rating = 1650,     Color = "blue_green" },
-            new RankInfo{ Name = "Master Gaurdian II",              Tag = "MG2",    Rating = 1800,     Color = "blue_green" },
-            new RankInfo{ Name = "Master Gaurdian Elite",           Tag = "MGE",    Rating = 1950,     Color = "emerald" },
-            new RankInfo{ Name = "Distinguished Master Gaurdian",   Tag = "DMG",    Rating = 2100,     Color = "mint" },
-            new RankInfo{ Name = "Legendary Eagle",                 Tag = "LE",     Rating = 2250,     Color = "yellow" },
-            new RankInfo{ Name = "Legendary Eagle Master",          Tag = "LEM",    Rating = 2400,     Color = "yellow" },
-            new RankInfo{ Name = "Supreme Master First Class",      Tag = "SMFC",   Rating = 2550,     Color = "orange" },
-            new RankInfo{ Name = "Global Elite",                    Tag = "GE",     Rating = 2700,     Color = "crimson" },
+            new RankInfo{ Name = "白银 I",                          Tag = "S1",     Rating = -150,     Color = "nickel" },
+            new RankInfo{ Name = "白银 II",                         Tag = "S2",     Rating = 0,        Color = "nickel" },
+            new RankInfo{ Name = "白银 III",                        Tag = "S3",     Rating = 150,      Color = "nickel" },
+            new RankInfo{ Name = "白银 IV",                         Tag = "S4",     Rating = 300,      Color = "nickel" },
+            new RankInfo{ Name = "白银精英",                         Tag = "SE",     Rating = 550,      Color = "silver" },
+            new RankInfo{ Name = "白银至尊精英",                      Tag = "SEM",    Rating = 700,      Color = "silver" },
+            new RankInfo{ Name = "黄金新星 I",                       Tag = "GN1",    Rating = 950,      Color = "cyan" },
+            new RankInfo{ Name = "黄金新星 II",                      Tag = "GN2",    Rating = 1100,     Color = "cyan" },
+            new RankInfo{ Name = "黄金新星 III",                     Tag = "GN3",    Rating = 1350,     Color = "cyan" },
+            new RankInfo{ Name = "黄金新星大师",                      Tag = "GNM",    Rating = 1500,     Color = "aqua" },
+            new RankInfo{ Name = "大师守卫 I",                       Tag = "MG1",    Rating = 1650,     Color = "blue_green" },
+            new RankInfo{ Name = "大师守卫 II",                      Tag = "MG2",    Rating = 1800,     Color = "blue_green" },
+            new RankInfo{ Name = "大师守卫精英",                      Tag = "MGE",    Rating = 1950,     Color = "emerald" },
+            new RankInfo{ Name = "卓越大师守卫",                      Tag = "DMG",    Rating = 2100,     Color = "mint" },
+            new RankInfo{ Name = "传奇之鹰",                         Tag = "LE",     Rating = 2250,     Color = "yellow" },
+            new RankInfo{ Name = "传奇之鹰大师",                      Tag = "LEM",    Rating = 2400,     Color = "yellow" },
+            new RankInfo{ Name = "至尊大师首席",                      Tag = "SMFC",   Rating = 2550,     Color = "orange" },
+            new RankInfo{ Name = "全球精英",                         Tag = "GE",     Rating = 2700,     Color = "crimson" },
         };
 
         public List<PlayerPermissions> RankCmdPermissions { get; set; } = new List<PlayerPermissions>()
@@ -74,6 +95,9 @@ namespace TheRiptide
         };
     }
 
+    /// <summary>
+    /// 段位信息类
+    /// </summary>
     public class RankInfo
     {
         public string Name { get; set; }
@@ -115,12 +139,11 @@ namespace TheRiptide
             player_matches.Clear();
         }
 
-        [PluginEvent(ServerEventType.PlayerJoined)]
         void OnPlayerJoined(Player player)
         {
-            if (!player.DoNotTrack)
+            if (!player.ReferenceHub.authManager.DoNotTrack)
             {
-                int id = player.PlayerId;
+                int id = player.ReferenceHub.PlayerId;
                 if (!player_ranks.ContainsKey(id))
                 {
                     var duplicates = player_ranks.Where((r) => r.Value.UserId == player.UserId);
@@ -137,7 +160,6 @@ namespace TheRiptide
             }
         }
 
-        [PluginEvent(ServerEventType.PlayerDeath)]
         void OnPlayerDeath(Player victim, Player killer, DamageHandlerBase damage)
         {
             if (killer != null && victim != killer && player_glikco.ContainsKey(victim.UserId) && player_glikco.ContainsKey(killer.UserId))
@@ -164,7 +186,7 @@ namespace TheRiptide
 
         public void RankLoaded(Player player)
         {
-            Database.Rank rank = player_ranks[player.PlayerId];
+            Database.Rank rank = player_ranks[player.ReferenceHub.PlayerId];
             if (rank.state != Database.RankState.Unranked && !player_glikco.ContainsKey(player.UserId))
             {
                 player_glikco.Add(player.UserId, new GlickoPlayer(rank.rating, rank.rd, rank.rv));
@@ -216,7 +238,7 @@ namespace TheRiptide
                         }
                         catch (Exception ex)
                         {
-                            Log.Error("glicko error: " + ex.ToString());
+                            Logger.Error("glicko error: " + ex.ToString());
                         }
                     }
                     Database.Singleton.SaveRank(rank);
@@ -228,16 +250,16 @@ namespace TheRiptide
                 }
                 catch(System.Exception ex)
                 {
-                    Log.Error("rank save error: " + ex.ToString());
+                    Logger.Error("rank save error: " + ex.ToString());
                 }
             }
         }
 
         public bool SetRank(Player player, float rating)
         {
-            if (player_ranks.ContainsKey(player.PlayerId))
+            if (player_ranks.ContainsKey(player.ReferenceHub.PlayerId))
             {
-                player_ranks[player.PlayerId].rating = rating;
+                player_ranks[player.ReferenceHub.PlayerId].rating = rating;
                 return true;
             }
             return false;
@@ -245,11 +267,11 @@ namespace TheRiptide
 
         public bool ResetRank(Player player)
         {
-            if (player_ranks.ContainsKey(player.PlayerId))
+            if (player_ranks.ContainsKey(player.ReferenceHub.PlayerId))
             {
-                player_ranks[player.PlayerId].rating = Rating;
-                player_ranks[player.PlayerId].rd = RatingDeviation;
-                player_ranks[player.PlayerId].rv = RatingVolatility;
+                player_ranks[player.ReferenceHub.PlayerId].rating = Rating;
+                player_ranks[player.ReferenceHub.PlayerId].rd = RatingDeviation;
+                player_ranks[player.ReferenceHub.PlayerId].rv = RatingVolatility;
                 return true;
             }
             return false;
@@ -294,7 +316,7 @@ namespace TheRiptide
 
         public Database.Rank GetRank(Player player)
         {
-            return player_ranks[player.PlayerId];
+            return player_ranks[player.ReferenceHub.PlayerId];
         }
 
         public RankInfo GetInfo(Database.Rank rank)
@@ -331,7 +353,7 @@ namespace TheRiptide
             RankInfo info = GetInfo(rank);
             if (!BadgeOverride.ColorNameToHex.ContainsKey(info.Color))
             {
-                Log.Error("invalid rank color: " + info.Color);
+                Logger.Error("invalid rank color: " + info.Color);
                 return;
             }
             string rank_hint = translation.RankMsg.Replace("{color}", BadgeOverride.ColorNameToHex[info.Color]).Replace("{rank}", config.BadgeFormat.Replace("{name}", info.Name));

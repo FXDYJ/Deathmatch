@@ -8,9 +8,8 @@ using Mirror;
 using MEC;
 using PlayerRoles;
 using PlayerStatsSystem;
-using PluginAPI.Core;
-using PluginAPI.Core.Attributes;
-using PluginAPI.Enums;
+using LabApi.Features.Wrappers;
+using LabApi.Features.Console;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -24,15 +23,26 @@ using Interactables.Interobjects.DoorUtils;
 
 namespace TheRiptide
 {
+    /// <summary>
+    /// 装备配置类
+    /// </summary>
     public class LoadoutConfig
     {
+        /// <summary>
+        /// 是否启用武器黑名单
+        /// </summary>
         public bool IsBlackListEnabled { get; set; } = true;
 
-        [Description("put black listed weapons here, see below for all weapons. does not effect weapons granted as a reward only guns on the menu")]
+        /// <summary>
+        /// 武器黑名单列表，仅影响菜单中的武器，不影响奖励武器
+        /// </summary>
+        [Description("在此添加禁用的武器，仅影响菜单中的武器，不影响奖励武器")]
         public List<ItemType> BlackList { get; set; } = new List<ItemType>();
-
-
-        [Description("list of all the different weapons (changing this does nothing)")]
+        
+        /// <summary>
+        /// 所有武器类型列表（修改此项无效）
+        /// </summary>
+        [Description("所有武器类型列表（修改此项无效）")]
         public List<ItemType> AllWeapons { get; set; } = new List<ItemType>
         {
             ItemType.GunAK,
@@ -48,14 +58,23 @@ namespace TheRiptide
         };
     }
 
+    /// <summary>
+    /// 装备管理类
+    /// </summary>
     public class Loadouts
     {
         public static Loadouts Singleton { get; private set; }
 
         LoadoutConfig config;
 
+        /// <summary>
+        /// 武器槽位枚举
+        /// </summary>
         public enum GunSlot { Primary, Secondary, Tertiary };
 
+        /// <summary>
+        /// 装备数据类
+        /// </summary>
         public class Loadout
         {
             public ItemType primary = ItemType.None;
@@ -80,36 +99,32 @@ namespace TheRiptide
             this.config = config;
         }
 
-        [PluginEvent(ServerEventType.RoundStart)]
         void OnRoundStart()
         {
             Scp330Interobject scp330 = RoomIdentifier.AllRoomIdentifiers.Where((r => r.Name == RoomName.Lcz330)).First().GetComponentInChildren<Scp330Interobject>();
             NetworkServer.UnSpawn(scp330.gameObject);
         }
 
-        [PluginEvent(ServerEventType.PlayerJoined)]
         void OnPlayerJoined(Player player)
         {
-            if (!player_loadouts.ContainsKey(player.PlayerId))
-                player_loadouts.Add(player.PlayerId, new Loadout());
+            if (!player_loadouts.ContainsKey(player.ReferenceHub.PlayerId))
+                player_loadouts.Add(player.ReferenceHub.PlayerId, new Loadout());
         }
 
-        [PluginEvent(ServerEventType.PlayerLeft)]
         void OnPlayerLeft(Player player)
         {
-            if (player_loadouts.ContainsKey(player.PlayerId))
+            if (player_loadouts.ContainsKey(player.ReferenceHub.PlayerId))
             {
-                if (!player.DoNotTrack)
+                if (!player.ReferenceHub.authManager.DoNotTrack)
                     Database.Singleton.SaveConfigLoadout(player);
-                player_loadouts.Remove(player.PlayerId);
+                player_loadouts.Remove(player.ReferenceHub.PlayerId);
             }
         }
 
-        [PluginEvent(ServerEventType.PlayerDropItem)]
         bool OnPlayerDropitem(Player player, ItemBase item)
         {
             bool drop_allowed = false;
-            Loadout loadout = player_loadouts[player.PlayerId];
+            Loadout loadout = player_loadouts[player.ReferenceHub.PlayerId];
             if (InventoryMenu.GetPlayerMenuID(player) == (int)DeathmatchMenu.MenuPage.None)
             {
                 if (IsGun(item.ItemTypeId))
@@ -167,27 +182,23 @@ namespace TheRiptide
             return drop_allowed;
         }
 
-        [PluginEvent(ServerEventType.PlayerDropAmmo)]
         bool OnPlayerDropAmmo(Player player, ItemType ammo, int amount)
         {
             return false;
         }
 
-        [PluginEvent(ServerEventType.PlayerShotWeapon)]
         void OnPlayerShotWeapon(Player player, Firearm firearm)
         {
-            player_loadouts[player.PlayerId].locked = true;
+            player_loadouts[player.ReferenceHub.PlayerId].locked = true;
             RemoveItem(player, ItemType.KeycardO5);
         }
 
-        [PluginEvent(ServerEventType.PlayerUsedItem)]
         void OnPlayerUsedItem(Player player, ItemBase item)
         {
-            player_loadouts[player.PlayerId].locked = true;
+            player_loadouts[player.ReferenceHub.PlayerId].locked = true;
             RemoveItem(player, ItemType.KeycardO5);
         }
 
-        [PluginEvent(ServerEventType.PlayerInteractDoor)]
         bool OnPlayerInteractDoor(Player player, DoorVariant door, bool can_open)
         {
             if (door.ActiveLocks > 0 && !player.IsBypassEnabled)
@@ -210,19 +221,17 @@ namespace TheRiptide
             return false;
         }
 
-        [PluginEvent(ServerEventType.PlayerDying)]
         void OnPlayerDying(Player target, Player killer, DamageHandlerBase damage)
         {
             target.ClearInventory();
         }
 
-        [PluginEvent(ServerEventType.PlayerSpawn)]
         void OnPlayerSpawn(Player player, RoleTypeId role)
         {
-            if (player == null || !player_loadouts.ContainsKey(player.PlayerId))
+            if (player == null || !player_loadouts.ContainsKey(player.ReferenceHub.PlayerId))
                 return;
 
-            Loadout loadout = player_loadouts[player.PlayerId];
+            Loadout loadout = player_loadouts[player.ReferenceHub.PlayerId];
             if (config.IsBlackListEnabled)
             {
                 if (config.BlackList.Contains(loadout.primary))
@@ -239,7 +248,7 @@ namespace TheRiptide
 
                 Timing.CallDelayed(0.0f, () =>
                 {
-                    if (player == null || !player_loadouts.ContainsKey(player.PlayerId))
+                    if (player == null || !player_loadouts.ContainsKey(player.ReferenceHub.PlayerId))
                         return;
                     player.ClearInventory();
                     AddLoadoutStartItems(player);
@@ -260,7 +269,7 @@ namespace TheRiptide
 
         public static Loadout GetLoadout(Player player)
         {
-            return player_loadouts[player.PlayerId];
+            return player_loadouts[player.ReferenceHub.PlayerId];
         }
 
         public static bool CustomiseLoadout(Player player)
@@ -282,7 +291,7 @@ namespace TheRiptide
 
         public static bool IsLoadoutEmpty(Player player)
         {
-            Loadout loadout = player_loadouts[player.PlayerId];
+            Loadout loadout = player_loadouts[player.ReferenceHub.PlayerId];
             if (Killstreaks.Singleton.IsLoadoutLocked(player))
                 return false;
             ItemType armor = Killstreaks.Singleton.ArmorType(player);
@@ -296,7 +305,7 @@ namespace TheRiptide
 
         public static void AddLoadoutStartItems(Player player)
         {
-            Loadout loadout = player_loadouts[player.PlayerId];
+            Loadout loadout = player_loadouts[player.ReferenceHub.PlayerId];
             Killstreaks.Killstreak killstreak = Killstreaks.GetKillstreak(player);
 
             if (!IsLoadoutEmpty(player))
@@ -323,7 +332,7 @@ namespace TheRiptide
 
         public bool SetGun(Player player, ItemType gun)
         {
-            Loadout loadout = player_loadouts[player.PlayerId];
+            Loadout loadout = player_loadouts[player.ReferenceHub.PlayerId];
 
             if(config.IsBlackListEnabled && config.BlackList.Contains(gun))
             {

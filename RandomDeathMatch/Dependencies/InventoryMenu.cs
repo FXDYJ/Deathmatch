@@ -3,9 +3,8 @@ using InventorySystem.Items.ThrowableProjectiles;
 using InventorySystem.Items.Usables;
 using MEC;
 using PlayerStatsSystem;
-using PluginAPI.Core;
-using PluginAPI.Core.Attributes;
-using PluginAPI.Enums;
+using LabApi.Features.Wrappers;
+using LabApi.Features.Console;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -62,27 +61,24 @@ namespace TheRiptide
             Singleton = this;
         }
 
-        [PluginEvent(ServerEventType.PlayerJoined)]
         void OnPlayerJoined(Player player)
         {
-            if (!player_menu.ContainsKey(player.PlayerId))
-                player_menu.Add(player.PlayerId, 0);
+            if (!player_menu.ContainsKey(player.ReferenceHub.PlayerId))
+                player_menu.Add(player.ReferenceHub.PlayerId, 0);
         }
 
-        [PluginEvent(ServerEventType.PlayerLeft)]
         void OnPlayerLeft(Player player)
         {
-            if (player_menu.ContainsKey(player.PlayerId))
-                player_menu.Remove(player.PlayerId);
+            if (player_menu.ContainsKey(player.ReferenceHub.PlayerId))
+                player_menu.Remove(player.ReferenceHub.PlayerId);
         }
 
-        [PluginEvent(ServerEventType.PlayerDropItem)]
         bool OnPlayerDropitem(Player player, ItemBase item)
         {
-            if (!player_menu.ContainsKey(player.PlayerId))
+            if (!player_menu.ContainsKey(player.ReferenceHub.PlayerId))
                 return true;
             bool allow_drop = true;
-            Menu menu = menus[player_menu[player.PlayerId]];
+            Menu menu = menus[player_menu[player.ReferenceHub.PlayerId]];
             Predicate<MenuItem> has_item = (menu_item) => { return menu_item.item == item.ItemTypeId; };
             if (menu.items.Exists(has_item))
                 allow_drop = menu.items.Find(has_item).on_click(player);
@@ -90,37 +86,33 @@ namespace TheRiptide
             return allow_drop;
         }
 
-        [PluginEvent(ServerEventType.PlayerUseItem)]
         bool OnPlayerUseItem(Player player, UsableItem item)
         {
-            if (!player_menu.ContainsKey(player.PlayerId))
+            if (!player_menu.ContainsKey(player.ReferenceHub.PlayerId))
                 return true;
-            if (player_menu[player.PlayerId] != 0)
+            if (player_menu[player.ReferenceHub.PlayerId] != 0)
                 return false;
             return true;
         }
 
-        [PluginEvent(ServerEventType.PlayerThrowItem)]
         bool OnThrowItem(Player player, ItemBase item, Rigidbody rb)
         {
-            if (!player_menu.ContainsKey(player.PlayerId))
+            if (!player_menu.ContainsKey(player.ReferenceHub.PlayerId))
                 return true;
-            if (player_menu[player.PlayerId] != 0)
+            if (player_menu[player.ReferenceHub.PlayerId] != 0)
                 return false;
             return true;
         }
 
-        [PluginEvent(ServerEventType.PlayerThrowProjectile)]
         public bool OnPlayerThrowProjectile(Player player, ThrowableItem item, ThrowableItem.ProjectileSettings projectileSettings, bool fullForce)
         {//todo fix
-            if (!player_menu.ContainsKey(player.PlayerId))
+            if (!player_menu.ContainsKey(player.ReferenceHub.PlayerId))
                 return true;
-            if (player_menu[player.PlayerId] != 0)
+            if (player_menu[player.ReferenceHub.PlayerId] != 0)
                 return false;
             return true;
         }
 
-        [PluginEvent(ServerEventType.PlayerDeath)]
         void OnPlayerDeath(Player target, Player killer, DamageHandlerBase damage)
         {
             if (!player_menu.ContainsKey(target.PlayerId))
@@ -181,7 +173,7 @@ namespace TheRiptide
 
         public static void SetMenu(Player player, int menu_id)
         {
-            player_menu[player.PlayerId] = menu_id;
+            player_menu[player.ReferenceHub.PlayerId] = menu_id;
         }
 
         public static MenuInfo GetInfo(int menu_id)
@@ -198,7 +190,7 @@ namespace TheRiptide
 
         public static int GetPlayerMenuID(Player player)
         {
-            return player_menu[player.PlayerId];
+            return player_menu[player.ReferenceHub.PlayerId];
         }
 
         public static void Clear()
