@@ -176,8 +176,8 @@ namespace TheRiptide
 
         [Description("确认删除数据菜单")]
         public string DeleteDataMenu { get; set; } = "<b><color=#43BFF0>[数据删除确认]</color></b> - <b><color=#FF0000>右键点击选择</color></b>";
-        public string AreYouSure { get; set; } = "<b>您确定吗？您必须开启"禁止追踪"才能执行此操作。<color=#FF0000>删除后无法恢复。</color> <color=#43BFF0>如果确定，请右键点击清洁工钥匙卡删除您的数据</color></b>";
-        public string FailedToDeleteData { get; set; } = "<b>删除数据失败，您必须在设置中开启"禁止追踪"</b>";
+        public string AreYouSure { get; set; } = "<b>您确定吗？您必须开启「禁止追踪」才能执行此操作。<color=#FF0000>删除后无法恢复。</color> <color=#43BFF0>如果确定，请右键点击清洁工钥匙卡删除您的数据</color></b>";
+        public string FailedToDeleteData { get; set; } = "<b>删除数据失败，您必须在设置中开启「禁止追踪」</b>";
         public string DeletedData { get; set; } = "数据已删除";
 
         #endregion
